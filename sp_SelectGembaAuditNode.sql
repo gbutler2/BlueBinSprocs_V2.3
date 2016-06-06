@@ -3,7 +3,8 @@ drop procedure sp_SelectGembaAuditNode
 GO
 
 CREATE PROCEDURE sp_SelectGembaAuditNode
-@LocationName varchar(50)
+@LocationName varchar(50),
+@Auditer varchar(50)
 
 --WITH ENCRYPTION
 AS
@@ -12,7 +13,9 @@ SET NOCOUNT ON
     select 
 	q.Date,
     q.[GembaAuditNodeID],
-	dl.[LocationName],
+	case
+		when dl.LocationID = dl.LocationName then dl.LocationID
+		else dl.LocationID + ' - ' + dl.[LocationName] end as LocationName,
 	u.LastName + ', ' + u.FirstName as Auditer,
     u.UserLogin as AuditerLogin,
     q.PS_TotalScore as [Pull Score],
@@ -26,9 +29,14 @@ SET NOCOUNT ON
 from [gemba].[GembaAuditNode] q
 inner join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
 inner join [bluebin].[BlueBinUser] u on q.AuditerUserID = u.BlueBinUserID
-    Where q.Active = 1 and dl.LocationName LIKE '%' + @LocationName + '%' order by q.Date desc
+    Where q.Active = 1 
+	and dl.LocationID + ' - ' + dl.[LocationName] LIKE '%' + @LocationName + '%' 
+	and u.LastName + ', ' + u.FirstName LIKE '%' + @Auditer + '%'
+	order by q.Date desc
 
 END
 GO
 grant exec on sp_SelectGembaAuditNode to appusers
 GO
+
+

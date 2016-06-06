@@ -12,27 +12,40 @@ GO
 
 
 
-if not exists (select * from sys.tables where name = 'BlueBinParMaster')
+if not exists (select * from sys.tables where name = 'Walkthrough')
 BEGIN
-CREATE TABLE [bluebin].[BlueBinParMaster](
-	[ParMasterID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
-	[FacilityID] smallint not null,
-	[LocationID] char (10) NOT NULL,
-	[ItemID] char (32) NOT NULL,
-	[BinSequence] varchar (50) NOT NULL,
-	[BinSize] varchar(5) NULL,
-	[BinUOM] varchar (10) NULL,
-	[BinQuantity] int NULL,
-    [LeadTime] smallint NULL,
-    [ItemType] varchar (10) NULL,
-	[WHLocationID] char(10) null,
-	[WHSequence] varchar(50) null,
-	[PatientCharge] int not NULL,
-	[Updated] int not null,
-	[LastUpdated] datetime not null
+CREATE TABLE [bluebin].[Walkthrough](
+	[WalkthroughID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	Client varchar(100) NULL,
+	Building varchar(100) NULL,
+	RoomName varchar(100) NULL,
+	RoomNumber varchar(50) NULL,
+	Rack int NULL,
+	Weeks int NULL,
+	ImageID int NULL,
+	Other varchar(max) NULL
 	
 )
 
+
+END
+GO
+
+if not exists (select * from sys.tables where name = 'ConesDeployed')
+BEGIN
+CREATE TABLE [bluebin].[ConesDeployed](
+	[ConesDeployedID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	FacilityID int NOT NULL,
+	LocationID varchar(7) NOT NULL,
+	ItemID varchar(32) NOT NULL,
+	ConeDeployed int,
+	Deployed datetime,
+	ConeReturned int NULL,
+	Returned datetime NULL,
+	Deleted int null,
+	LastUpdated datetime not null
+	
+)
 
 END
 GO
@@ -89,6 +102,8 @@ VALUES
 ('MENU-Scanning','1','DMS',1,getdate(),''),
 ('MENU-Other','1','DMS',1,getdate(),''),
 ('ADMIN-PARMASTER',0,'DMS',1,getdate(),''),
+('GembaShadowTitle','Tech','DMS',1,getdate(),'BlueBin Resource Title that is available in Shadowed User section of Gemba Audit'),
+('GembaShadowTitle','Strider','DMS',1,getdate(),'BlueBin Resource Title that is available in Shadowed User section of Gemba Audit'),
 ('ReportDateStart','-90','Tableau',1,getdate(),'This value is how many days back to start the analytics for something like the Kanban table'),
 ('SlowBinDays','90','Tableau',1,getdate(),'This is a configuarble value for how many days you want to configure for a bin to be slow.  Default is 90'),
 ('StaleBinDays','180','Tableau',1,getdate(),'This is a configuarble value for how many days you want to configure for a bin to be stale.  Default is 180')
@@ -375,6 +390,21 @@ insert into bluebin.Document (DocumentName,DocumentType,DocumentSource,Document,
 ('Belt Certificate Overview','application/ppsx','BeltCertification','D:\BlueBinDocuments\'+(select DB_NAME())+'\BeltCertification\DMS-CERTIFICATION.ppsx',1,getdate(),getdate())
 END
 ;
+END
+GO
+
+if not exists (select * from sys.tables where name = 'DimBinHistory')
+BEGIN
+CREATE TABLE [bluebin].[DimBinHistory](
+	DimBinHistoryID INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	[FacilityID] smallint not null,
+	[LocationID] char(5) not null,
+	[ItemID] char(32) NOT NULL,
+	BinQty int not null,
+	LastUpdated date
+
+)
+
 END
 GO
 

@@ -1,7 +1,7 @@
 
 	
 	
-	--Upgrade Script v2.3
+	--Upgrade Script v2.3Select
 --Backward compatible to V1.0
 --Created By Gerry Butler 20160426
 
@@ -149,7 +149,8 @@ if not exists(select * from bluebin.BlueBinOperations where OpName ='DOCUMENTS-U
 BEGIN
 Insert into bluebin.BlueBinOperations (OpName,[Description]) VALUES
 ('DOCUMENTS-UploadUtility','Give User ability to see Upload Utility and Upload/Update Documents in Op Procedures')
-
+END
+GO
 
 
 if not exists(select * from bluebin.BlueBinOperations where OpName like 'ADMIN%')  
@@ -165,15 +166,6 @@ Insert into bluebin.BlueBinOperations (OpName,[Description]) VALUES
 END
 GO
 
-insert into bluebin.BlueBinRoleOperations 
-select 
-(select RoleID from bluebin.BlueBinRoles where RoleName in ('BlueBinPersonnel')),
-so.OpID
-from bluebin.BlueBinOperations so
-where so.OpName ='DOCUMENTS-UploadUtility' and so.OpID not in 
-		(select OpID from bluebin.BlueBinRoleOperations where RoleID in (select RoleID from bluebin.BlueBinRoles where RoleName in ('BlueBinPersonnel')))
-END
-GO
 
 
 if not exists(select * from bluebin.Config where ConfigName = 'FriendlySiteName')
@@ -202,6 +194,8 @@ GO
 
 if not exists (select * from bluebin.BlueBinOperations where [OpName] like 'MENU%')
 BEGIN
+insert into bluebin.BlueBinOperations select 'MENU-Cones','Give User ability to see the Cones Module'
+insert into bluebin.BlueBinOperations select 'MENU-Cones-EDIT','Give User ability to check out and in Cones'
 insert into bluebin.BlueBinOperations select 'MENU-Dashboard','Give User ability to see the Dashboard Menu'
 insert into bluebin.BlueBinOperations select 'MENU-QCN','Give User ability to see the QCN Menu'
 insert into bluebin.BlueBinOperations select 'MENU-Gemba','Give User ability to see the Gemba Menu'
@@ -218,7 +212,8 @@ select sr.RoleID,so.OpID
 from bluebin.BlueBinRoles sr,bluebin.BlueBinOperations so
 where so.OpName like 'MENU%' and so.OpID not in (select OpID from bluebin.BlueBinRoleOperations)
 
-
+END 
+GO
 
 
 
@@ -255,26 +250,89 @@ update bluebin.Config set [Description] = 'Tableau Setting - GLACCOUNT value tha
 END
 GO
 
+if not exists(select * from bluebin.Config where ConfigName = 'TableauSiteName')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'TableauSiteName','Demo',1,getdate(),'Tableau','Name of the site where we publish the workbooks for this client on Tableau Server'
+
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'TableauDefaultUser','demo@bluebin.com',1,getdate(),'Tableau','Name of Default User to use instead of bluebin'
+
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'TableauHBDefaultUser','demohb@bluebin.com',1,getdate(),'Tableau','Name of Default HB User to use instead of bluebin'
+
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'TableauWorkbook','Demo',1,getdate(),'Tableau','Name of Default Workbook Used'
+END
+GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'GembaShadowTitle')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'GembaShadowTitle','Tech',1,getdate(),'DMS','BlueBin Resource Title that is available in Shadowed User section of Gemba Audit'
+
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'GembaShadowTitle','Strider',1,getdate(),'DMS','BlueBin Resource Title that is available in Shadowed User section of Gemba Audit'
+END
+GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'UseClinicalDescription')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'UseClinicalDescription','1',1,getdate(),'Tableau','Use ClinicalDescription from UserFields instead of Description for DimItem'
+END
+GO
+
+
 if not exists(select * from bluebin.Config where ConfigName = 'RQ500User')  
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
-select 'RQ500User','mmstaff',1,getdate(),'DMS','User to enter as Requester when processing a batch into RQ500'
+select 'RQ500User','mmstaff',1,getdate(),'Interface','User to enter as Requester when processing a batch into RQ500. 19-28'
 END
 GO
 
 if not exists(select * from bluebin.Config where ConfigName = 'RQ500FromLoc')  
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
-select 'RQ500FromLoc','STORE',1,getdate(),'DMS','Inventory location that supplies the items or the purchase order ship to location that receives the items.'
+select 'RQ500FromLoc','STORE',1,getdate(),'Interface','Inventory location that supplies the items or the purchase order ship to location that receives the items.54-58'
 END
 GO
 
 if not exists(select * from bluebin.Config where ConfigName = 'RQ500FromComp')  
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
-select 'RQ500FromComp','1',1,getdate(),'DMS','Company that is the source of the items for Reqs.'
+select 'RQ500FromComp','1',1,getdate(),'Interface','Company that is the source of the items for Reqs.50-53'
 END
 GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'RQ500AccountCat')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'RQ500AccountCat','200',1,getdate(),'Interface','Accounting category code, used for reporting and inquiry functions. 241-245'
+END
+GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'RQ500AccountUnit')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'RQ500AccountUnit','1000',1,getdate(),'Interface','Posting accounting unit when processing a batch into RQ500. 278-292'
+END
+GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'RQ500Account')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'RQ500Account','016180',1,getdate(),'Interface','Account from the general ledger for PO when processing an RQ500 batch. 293-298'
+END
+GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'RQ500SubAccount')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'RQ500SubAccount','0000',1,getdate(),'Interface','Subaccount from the general ledger charged for this requisition. 299-302'
+END
+GO
+
 
 
 if not exists(select * from bluebin.Config where ConfigName = 'QCN-ReferenceC')  
@@ -316,6 +374,7 @@ GO
 if not exists(select * from bluebin.Config where ConfigName like 'MENU-%')  
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,ConfigType,Active,LastUpdated,[Description]) VALUES
+('MENU-Cones','1','DMS',1,getdate(),'Ability to see the Cones Module'),
 ('MENU-Dashboard','1','DMS',1,getdate(),''),
 ('MENU-QCN','1','DMS',1,getdate(),''),
 ('MENU-Gemba','1','DMS',1,getdate(),''),
@@ -345,7 +404,24 @@ Print 'Table Updates Complete'
 
 --*****************************************************
 --**************************NEWTABLE**********************
+if not exists (select * from sys.tables where name = 'ConesDeployed')
+BEGIN
+CREATE TABLE [bluebin].[ConesDeployed](
+	[ConesDeployedID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	FacilityID int NOT NULL,
+	LocationID varchar(7) NOT NULL,
+	ItemID varchar(32) NOT NULL,
+	ConeDeployed int,
+	Deployed datetime,
+	ConeReturned int NULL,
+	Returned datetime NULL,
+	Deleted int null,
+	LastUpdated datetime not null
+	
+)
 
+END
+GO
 
 --*****************************************************
 --**************************NEWTABLE**********************
@@ -646,6 +722,8 @@ VALUES
 ('MENU-Hardware','1','DMS',1,getdate(),''),
 ('MENU-Scanning','1','DMS',1,getdate(),''),
 ('MENU-Other','1','DMS',1,getdate(),''),
+('GembaShadowTitle','Tech','DMS',1,getdate(),'BlueBin Resource Title that is available in Shadowed User section of Gemba Audit'),
+('GembaShadowTitle','Strider','DMS',1,getdate(),'BlueBin Resource Title that is available in Shadowed User section of Gemba Audit'),
 ('ReportDateStart','-90','Tableau',1,getdate(),'This value is how many days back to start the analytics for something like the Kanban table'),
 ('SlowBinDays','90','Tableau',1,getdate(),'This is a configuarble value for how many days you want to configure for a bin to be slow.  Default is 90'),
 ('StaleBinDays','180','Tableau',1,getdate(),'This is a configuarble value for how many days you want to configure for a bin to be stale.  Default is 180')
@@ -2271,10 +2349,12 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCN') an
 drop procedure sp_SelectQCN
 GO
 
---exec sp_SelectQCN '',0
+
+--exec sp_SelectQCN '%','0','%'
 CREATE PROCEDURE sp_SelectQCN
 @LocationName varchar(50)
 ,@Completed int
+,@AssignedUserName varchar(50)
 
 --WITH ENCRYPTION
 AS
@@ -2291,13 +2371,15 @@ end
 select 
 	q.[QCNID],
 	q.[LocationID],
-        dl.[LocationName],
+    case
+		when dl.LocationID = dl.LocationName then dl.LocationID
+		else dl.LocationID + ' - ' + dl.[LocationName] end as LocationName,
 	u.LastName + ', ' + u.FirstName  as RequesterUserName,
         u.[Login] as RequesterLogin,
     u.[Title] as RequesterTitleName,
-    case when v.Login = 'None' then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
-        v.[Login] as AssignedLogin,
-    v.[Title] as AssignedTitleName,
+    case when v.Login is null then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
+        ISNULL(v.[Login],'') as AssignedLogin,
+    ISNULL(v.[Title],'') as AssignedTitleName,
 	qt.Name as QCNType,
 q.[ItemID],
 COALESCE(di.ItemClinicalDescription,di.ItemDescription,'No Description') as ItemClinicalDescription,
@@ -2326,8 +2408,11 @@ left join [bluebin].[BlueBinResource] v on q.AssignedUserID = v.BlueBinResourceI
 inner join [qcn].[QCNType] qt on q.QCNTypeID = qt.QCNTypeID
 inner join [qcn].[QCNStatus] qs on q.QCNStatusID = qs.QCNStatusID
 
-WHERE q.Active = 1 and dl.LocationName LIKE '%' + @LocationName + '%' 
+WHERE q.Active = 1 
+and dl.LocationID + ' - ' + dl.[LocationName] LIKE '%' + @LocationName + '%' 
 and q.QCNStatusID not in (@QCNStatus,@QCNStatus2)
+and case	
+		when @AssignedUserName <> '%' then v.LastName + ', ' + v.FirstName else '' end LIKE  '%' + @AssignedUserName + '%' 
             order by q.[DateEntered] asc--,convert(int,(getdate() - q.[DateEntered])) desc
 
 END
@@ -2960,9 +3045,10 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectConfig')
 drop procedure sp_SelectConfig
 GO
 
---exec sp_SelectConfig
+--exec sp_SelectConfig 'Tableau'
 
 CREATE PROCEDURE sp_SelectConfig
+@ConfigType varchar(50)
 
 --WITH ENCRYPTION
 AS
@@ -2982,6 +3068,7 @@ SET NOCOUNT ON
 	[Description]
 	
 	FROM bluebin.[Config]
+	where ConfigType like  '%' + @ConfigType + '%'
 	order by ConfigType,ConfigName
 
 END
@@ -2998,7 +3085,8 @@ drop procedure sp_SelectGembaAuditNode
 GO
 
 CREATE PROCEDURE sp_SelectGembaAuditNode
-@LocationName varchar(50)
+@LocationName varchar(50),
+@Auditer varchar(50)
 
 --WITH ENCRYPTION
 AS
@@ -3007,9 +3095,9 @@ SET NOCOUNT ON
     select 
 	q.Date,
     q.[GembaAuditNodeID],
-	dl.[LocationName],
+	dl.LocationID + ' - ' + dl.[LocationName] as LocationName,
 	u.LastName + ', ' + u.FirstName as Auditer,
-    LOWER(u.UserLogin) as AuditerLogin,
+    u.UserLogin as AuditerLogin,
     q.PS_TotalScore as [Pull Score],
     q.RS_TotalScore as [Replenishment Score],
     q.NIS_TotalScore as [Node Integrity Score],
@@ -3021,12 +3109,16 @@ SET NOCOUNT ON
 from [gemba].[GembaAuditNode] q
 inner join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
 inner join [bluebin].[BlueBinUser] u on q.AuditerUserID = u.BlueBinUserID
-    Where q.Active = 1 and dl.LocationName LIKE '%' + @LocationName + '%' order by q.Date desc
+    Where q.Active = 1 
+	and dl.LocationID + ' - ' + dl.[LocationName] LIKE '%' + @LocationName + '%' 
+	and u.LastName + ', ' + u.FirstName LIKE '%' + @Auditer + '%'
+	order by q.Date desc
 
 END
 GO
 grant exec on sp_SelectGembaAuditNode to appusers
 GO
+
 
 
 --*****************************************************
@@ -3193,7 +3285,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectGembaSha
 drop procedure sp_SelectGembaShadow
 GO
 
---exec sp_EditConfig 'TEST'
+--sp_SelectGembaShadow
 
 CREATE PROCEDURE sp_SelectGembaShadow
 
@@ -3207,13 +3299,13 @@ SET NOCOUNT ON
 	FROM [bluebin].[BlueBinResource] 
 	
 	WHERE 
-		Title like '%Tech%' 
-			or Title like '%Strider%'
+		Title in (Select ConfigValue from bluebin.Config where ConfigName = 'GembaShadowTitle')
 
 END
 GO
 grant exec on sp_SelectGembaShadow to appusers
 GO
+
 
 
 --*****************************************************
@@ -3222,7 +3314,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectLocation
 drop procedure sp_SelectLocation
 GO
 
---exec SelectLocation 
+--exec sp_SelectLocation 
 
 CREATE PROCEDURE sp_SelectLocation
 
@@ -3230,11 +3322,17 @@ CREATE PROCEDURE sp_SelectLocation
 AS
 BEGIN
 SET NOCOUNT ON
-SELECT LocationID,LocationName FROM [bluebin].[DimLocation] where BlueBinFlag = 1 order by LocationName
+SELECT 
+LocationID,
+--LocationName,
+case when LocationID = LocationName then LocationID else LocationID + ' - ' + [LocationName] end as LocationName 
+
+FROM [bluebin].[DimLocation] where BlueBinFlag = 1
 END
 GO
 grant exec on sp_SelectLocation to appusers
 GO
+
 
 --*****************************************************
 --**************************SPROC**********************
@@ -4410,12 +4508,19 @@ from [bluebin].[DimBin] a
                                 inner join [bluebin].[DimItem] b on rtrim(a.ItemID) = rtrim(b.ItemID)  
 								UNION 
 								select distinct LocationID,'' as ItemID,'' as ItemClinicalDescription, ''  as ExtendedDescription from [bluebin].[DimBin]
-                                       order by rTrim(a.ItemID)+ ' - ' + COALESCE(b.ItemClinicalDescription,b.ItemDescription,'No Description') asc
+                                       
+								UNION 
+								select distinct q.LocationID,rTrim(q.ItemID) as ItemID,COALESCE(di.ItemClinicalDescription,di.ItemDescription,'No Description'),rTrim(q.ItemID)+ ' - ' + COALESCE(di.ItemClinicalDescription,di.ItemDescription,'No Description') as ExtendedDescription  
+								from qcn.QCN q
+								inner join bluebin.DimItem di on q.ItemID = di.ItemID
+								inner join bluebin.DimLocation dl on q.LocationID = dl.LocationID
+                                       order by 4 asc
 
 END
 GO
 grant exec on sp_SelectQCNLocation to appusers
 GO
+
 
 
 
@@ -4523,6 +4628,33 @@ GO
 grant exec on sp_DeleteImages to appusers
 GO
 
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectFacilities') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectFacilities
+GO
+
+--exec sp_SelectFacilities 
+CREATE PROCEDURE sp_SelectFacilities
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+SELECT DISTINCT rtrim(df.[FacilityID]) as FacilityID,df.[FacilityName] 
+FROM bluebin.[DimFacility] df
+
+inner join bluebin.DimLocation dl on df.FacilityID = dl.LocationFacility and dl.BlueBinFlag = 1
+order by 1 desc
+
+END 
+GO
+grant exec on sp_SelectFacilities to public
+GO
 
 --*****************************************************
 --**************************SPROC**********************
@@ -4744,8 +4876,32 @@ GO
 grant exec on sp_InsertBlueBinLocationMaster to appusers
 GO
 
+--*****************************************************
+--**************************SPROC**********************
 
 
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectConfigValues') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectConfigValues
+GO
+
+--exec sp_SelectConfigValues 'TableauSiteName'  exec sp_SelectConfigValues 'TableauDefaultUser'
+
+CREATE PROCEDURE sp_SelectConfigValues
+	@ConfigName NVARCHAR(50)
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+	SELECT 
+	ConfigValue
+	FROM bluebin.[Config] 
+	where ConfigName = @ConfigName
+
+END
+GO
+grant exec on sp_SelectConfigValues to appusers
+GO
 
 
 
@@ -5209,7 +5365,15 @@ set BinSequence = @BinSequence,
 --WHERE rtrim(LocationID) = rtrim(@LocationID)
 --	and rtrim(ItemID) = rtrim(@ItemID)
 --		and FacilityID = @FacilityID 
+update bluebin.BlueBinParMaster set Updated = 0 FROM
+	(select LocationID as L,ItemID as I,BinFacility,BinSequence as BS,BinQty as BQ,BinSize as Size,BinLeadTime from bluebin.DimBin) as db
 
+where 
+	rtrim(ItemID) = rtrim(db.I) 
+	and rtrim(LocationID) = rtrim(db.L) 
+	and FacilityID = db.BinFacility 
+	and Updated = 1 
+	and (BinSequence <> db.BS OR BinQuantity <> convert(int,db.BQ) OR BinSize <> db.Size OR LeadTime <> db.BinLeadTime)
 
 END
 GO
@@ -5416,6 +5580,177 @@ GO
 grant exec on sp_EditTrainingModule to appusers
 GO
 
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectConesDeployed') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectConesDeployed
+GO
+
+--exec sp_SelectConesDeployed '006',''
+
+CREATE PROCEDURE sp_SelectConesDeployed
+@Location varchar(7),
+@Item varchar(32)
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+	SELECT 
+	cd.ConesDeployedID,
+	cd.Deployed,
+	df.FacilityID,
+	df.FacilityName,
+	dl.LocationID,
+	dl.LocationName,
+	di.ItemID,
+	di.ItemDescription,
+	db.BinSequence,
+	case when so.ItemID is not null then 'Yes' else 'No' end as DashboardStockout
+	
+	FROM bluebin.[ConesDeployed] cd
+	inner join bluebin.DimFacility df on cd.FacilityID = df.FacilityID
+	inner join bluebin.DimLocation dl on cd.LocationID = dl.LocationID
+	inner join bluebin.DimItem di on cd.ItemID = di.ItemID
+	inner join bluebin.DimBin db on df.FacilityID = db.BinFacility and dl.LocationID = db.LocationID and di.ItemID = db.ItemID
+	left outer join (select distinct FacilityID,LocationID,ItemID from tableau.Kanban where StockOut = 1 and [Date] = (select max([Date]) from tableau.Kanban)) so 
+		on cd.FacilityID = so.FacilityID and cd.LocationID = so.LocationID and cd.ItemID = so.ItemID
+	where cd.Deleted = 0 and cd.ConeReturned = 0
+	and
+		(dl.LocationName like '%' + @Location + '%' or dl.LocationID like '%' + @Location + '%')
+	and 
+		(di.ItemID like '%' + @Item + '%' or di.ItemDescription like '%' + @Item + '%')
+	order by cd.Deployed desc
+	
+END
+GO
+grant exec on sp_SelectConesDeployed to appusers
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertConesDeployed') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_InsertConesDeployed
+GO
+
+--exec sp_InsertConesDeployed
+
+CREATE PROCEDURE sp_InsertConesDeployed
+@FacilityID int
+,@LocationID varchar (7)
+,@ItemID varchar (32)
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+
+insert into bluebin.ConesDeployed (FacilityID,LocationID,ItemID,ConeDeployed,Deployed,ConeReturned,Deleted,LastUpdated) VALUES
+(@FacilityID,@LocationID,@ItemID,1,getdate(),0,0,getdate()) 
+
+END
+
+
+GO
+grant exec on sp_InsertConesDeployed to appusers
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_DeleteConesDeployed') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_DeleteConesDeployed
+GO
+
+--exec sp_EditConesDeployed'TEST'
+
+CREATE PROCEDURE sp_DeleteConesDeployed
+@ConesDeployedID int
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+	Update bluebin.[ConesDeployed] 
+	set Deleted = 1, LastUpdated = getdate()
+	WHERE [ConesDeployedID] = @ConesDeployedID 
+
+				
+
+END
+GO
+grant exec on sp_DeleteConesDeployed to appusers
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_EditConesDeployed') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_EditConesDeployed
+GO
+
+--exec sp_EditConesDeployed 
+
+
+CREATE PROCEDURE sp_EditConesDeployed
+@ConesDeployedID int
+
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+	Update bluebin.ConesDeployed set 
+	ConeReturned = 1,
+	Returned = getdate(),
+	LastUpdated = getdate() 
+	where ConesDeployedID = @ConesDeployedID
+
+END
+GO
+grant exec on sp_EditConesDeployed to appusers
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectConfigType') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectConfigType
+GO
+
+--exec sp_SelectConfigType
+
+CREATE PROCEDURE sp_SelectConfigType
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+	
+	declare @ConfigType Table (ConfigType varchar(50))
+
+	insert into @ConfigType (ConfigType) VALUES
+	('Tableau'),
+	('DMS'),
+	('Interface'),
+	('Other')
+
+	SELECT * from @ConfigType order by 1 asc
+	
+
+END
+GO
+grant exec on sp_SelectConfigType to appusers
+GO
 
 
 
@@ -5541,6 +5876,53 @@ GO
 grant exec on ssp_BBS to public
 GO
 
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_CleanLawsonTables') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_CleanLawsonTables
+GO
+
+--exec sp_CleanLawsonTables
+CREATE PROCEDURE sp_CleanLawsonTables
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+truncate table dbo.APCOMPANY
+truncate table dbo.APVENMAST
+truncate table dbo.BUYER
+truncate table dbo.GLCHARTDTL
+truncate table dbo.GLNAMES
+truncate table dbo.GLTRANS
+truncate table dbo.ICCATEGORY
+truncate table dbo.ICMANFCODE
+truncate table dbo.ICLOCATION
+truncate table dbo.ICTRANS
+truncate table dbo.ITEMLOC
+truncate table dbo.ITEMMAST
+truncate table dbo.ITEMSRC
+truncate table dbo.MAINVDTL
+truncate table dbo.MAINVMSG
+truncate table dbo.MMDIST
+truncate table dbo.POCODE
+truncate table dbo.POLINE
+truncate table dbo.POLINESRC
+truncate table dbo.PORECLINE
+truncate table dbo.POVAGRMTLN
+truncate table dbo.PURCHORDER
+truncate table dbo.REQHEADER
+truncate table dbo.REQLINE
+truncate table dbo.REQUESTER
+truncate table dbo.RQLOC
+
+END
+GO
+grant exec on sp_CleanLawsonTables to appusers
+GO
+
 Print 'SSP Sproc Add/Updates Complete'
 --*************************************************************************************************************************************************
 --Grant Exec
@@ -5594,7 +5976,7 @@ Print 'Job Updates Complete'
 --Version Update
 --*************************************************************************************************************************************************
 
-declare @version varchar(50) = '2.3.20160527' --Update Version Number here
+declare @version varchar(50) = '2.3.20160603' --Update Version Number here
 
 
 if not exists (select * from bluebin.Config where ConfigName = 'Version')

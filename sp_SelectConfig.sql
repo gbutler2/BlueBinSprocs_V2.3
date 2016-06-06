@@ -2,9 +2,10 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectConfig')
 drop procedure sp_SelectConfig
 GO
 
---exec sp_SelectConfig
+--exec sp_SelectConfig 'Tableau'
 
 CREATE PROCEDURE sp_SelectConfig
+@ConfigType varchar(50)
 
 --WITH ENCRYPTION
 AS
@@ -24,6 +25,7 @@ SET NOCOUNT ON
 	[Description]
 	
 	FROM bluebin.[Config]
+	where ConfigType like  '%' + @ConfigType + '%'
 	order by ConfigType,ConfigName
 
 END

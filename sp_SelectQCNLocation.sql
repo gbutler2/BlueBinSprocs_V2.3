@@ -14,12 +14,20 @@ from [bluebin].[DimBin] a
                                 inner join [bluebin].[DimItem] b on rtrim(a.ItemID) = rtrim(b.ItemID)  
 								UNION 
 								select distinct LocationID,'' as ItemID,'' as ItemClinicalDescription, ''  as ExtendedDescription from [bluebin].[DimBin]
-                                       order by rTrim(a.ItemID)+ ' - ' + COALESCE(b.ItemClinicalDescription,b.ItemDescription,'No Description') asc
+                                       
+								UNION 
+								select distinct q.LocationID,rTrim(q.ItemID) as ItemID,COALESCE(di.ItemClinicalDescription,di.ItemDescription,'No Description'),rTrim(q.ItemID)+ ' - ' + COALESCE(di.ItemClinicalDescription,di.ItemDescription,'No Description') as ExtendedDescription  
+								from qcn.QCN q
+								inner join bluebin.DimItem di on q.ItemID = di.ItemID
+								inner join bluebin.DimLocation dl on q.LocationID = dl.LocationID
+                                       order by 4 asc
 
 END
 GO
 grant exec on sp_SelectQCNLocation to appusers
 GO
+
+
 
 
 

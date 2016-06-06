@@ -2,10 +2,12 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCN') an
 drop procedure sp_SelectQCN
 GO
 
---exec sp_SelectQCN '',''
+
+--exec sp_SelectQCN '%','0','%'
 CREATE PROCEDURE sp_SelectQCN
 @LocationName varchar(50)
 ,@Completed int
+,@AssignedUserName varchar(50)
 
 --WITH ENCRYPTION
 AS
@@ -22,13 +24,15 @@ end
 select 
 	q.[QCNID],
 	q.[LocationID],
-        dl.[LocationName],
+    case
+		when dl.LocationID = dl.LocationName then dl.LocationID
+		else dl.LocationID + ' - ' + dl.[LocationName] end as LocationName,
 	u.LastName + ', ' + u.FirstName  as RequesterUserName,
         u.[Login] as RequesterLogin,
     u.[Title] as RequesterTitleName,
-    case when v.Login = 'None' then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
-        v.[Login] as AssignedLogin,
-    v.[Title] as AssignedTitleName,
+    case when v.Login is null then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
+        ISNULL(v.[Login],'') as AssignedLogin,
+    ISNULL(v.[Title],'') as AssignedTitleName,
 	qt.Name as QCNType,
 q.[ItemID],
 COALESCE(di.ItemClinicalDescription,di.ItemDescription,'No Description') as ItemClinicalDescription,
@@ -57,11 +61,17 @@ left join [bluebin].[BlueBinResource] v on q.AssignedUserID = v.BlueBinResourceI
 inner join [qcn].[QCNType] qt on q.QCNTypeID = qt.QCNTypeID
 inner join [qcn].[QCNStatus] qs on q.QCNStatusID = qs.QCNStatusID
 
-WHERE q.Active = 1 and dl.LocationName LIKE '%' + @LocationName + '%' 
+WHERE q.Active = 1 
+and dl.LocationID + ' - ' + dl.[LocationName] LIKE '%' + @LocationName + '%' 
 and q.QCNStatusID not in (@QCNStatus,@QCNStatus2)
+and case	
+		when @AssignedUserName <> '%' then v.LastName + ', ' + v.FirstName else '' end LIKE  '%' + @AssignedUserName + '%' 
             order by q.[DateEntered] asc--,convert(int,(getdate() - q.[DateEntered])) desc
 
 END
 GO
 grant exec on sp_SelectQCN to appusers
 GO
+
+
+

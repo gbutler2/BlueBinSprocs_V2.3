@@ -34,7 +34,15 @@ set BinSequence = @BinSequence,
 --WHERE rtrim(LocationID) = rtrim(@LocationID)
 --	and rtrim(ItemID) = rtrim(@ItemID)
 --		and FacilityID = @FacilityID 
+update bluebin.BlueBinParMaster set Updated = 0 FROM
+	(select LocationID as L,ItemID as I,BinFacility,BinSequence as BS,BinQty as BQ,BinSize as Size,BinLeadTime from bluebin.DimBin) as db
 
+where 
+	rtrim(ItemID) = rtrim(db.I) 
+	and rtrim(LocationID) = rtrim(db.L) 
+	and FacilityID = db.BinFacility 
+	and Updated = 1 
+	and (BinSequence <> db.BS OR BinQuantity <> convert(int,db.BQ) OR BinSize <> db.Size OR LeadTime <> db.BinLeadTime)
 
 END
 GO

@@ -2,7 +2,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectLocation
 drop procedure sp_SelectLocation
 GO
 
---exec SelectLocation 
+--exec sp_SelectLocation 
 
 CREATE PROCEDURE sp_SelectLocation
 
@@ -10,7 +10,12 @@ CREATE PROCEDURE sp_SelectLocation
 AS
 BEGIN
 SET NOCOUNT ON
-SELECT LocationID,LocationName FROM [bluebin].[DimLocation] where BlueBinFlag = 1
+SELECT 
+LocationID,
+--LocationName,
+case when LocationID = LocationName then LocationID else LocationID + ' - ' + [LocationName] end as LocationName 
+
+FROM [bluebin].[DimLocation] where BlueBinFlag = 1
 END
 GO
 grant exec on sp_SelectLocation to appusers

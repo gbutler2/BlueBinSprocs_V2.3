@@ -2,7 +2,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectGembaSha
 drop procedure sp_SelectGembaShadow
 GO
 
---exec sp_EditConfig 'TEST'
+--sp_SelectGembaShadow
 
 CREATE PROCEDURE sp_SelectGembaShadow
 
@@ -16,8 +16,7 @@ SET NOCOUNT ON
 	FROM [bluebin].[BlueBinResource] 
 	
 	WHERE 
-		Title like '%Tech%' 
-			or Title like '%Strider%'
+		Title in (Select ConfigValue from bluebin.Config where ConfigName = 'GembaShadowTitle')
 
 END
 GO

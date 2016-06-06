@@ -77,10 +77,10 @@ SELECT distinct ITEM,
 INTO   #LastPO
 FROM   POLINE a
        INNER JOIN PURCHORDER b
-               ON a.PO_NUMBER = b.PO_NUMBER
+              ON a.PO_NUMBER = b.PO_NUMBER
                   AND a.COMPANY = b.COMPANY
                   AND a.PO_CODE = b.PO_CODE
-			   
+--WHERE ITEM like '%30003%'			   
 GROUP  BY ITEM
 
 SELECT 
@@ -141,7 +141,8 @@ where a.REPLENISH_PRI = 1
 
 
 /*********************		CREATE DimItem		**************************************/
-         
+Declare @UseClinicalDescription int
+select @UseClinicalDescription = ConfigValue from bluebin.Config where ConfigName = 'UseClinicalDescription'         
 		
 
 SELECT Row_number()
@@ -150,9 +151,13 @@ SELECT Row_number()
        a.ITEM                              AS ItemID,
        a.DESCRIPTION                       AS ItemDescription,
 	   a.DESCRIPTION2					   AS ItemDescription2,
-       e.ClinicalDescription               AS ItemClinicalDescription,
+       case 
+		when @UseClinicalDescription = 1 
+		then e.ClinicalDescription
+		else a.DESCRIPTION end             AS ItemClinicalDescription,
        a.ACTIVE_STATUS                     AS ActiveStatus,
-       a.MANUF_NBR                         AS ItemManufacturer, --b.DESCRIPTION
+       icm.DESCRIPTION                     AS ItemManufacturer, --b.DESCRIPTION
+	   --a.MANUF_NBR                         AS ItemManufacturer, --b.DESCRIPTION
        a.MANUF_NBR                         AS ItemManufacturerNumber,
        d.VENDOR_VNAME                      AS ItemVendor,
        c.VENDOR                            AS ItemVendorNumber,
@@ -176,14 +181,18 @@ FROM   ITEMMAST a
        LEFT JOIN #ClinicalDescriptions e
               ON ltrim(rtrim(a.ITEM)) = ltrim(rtrim(e.ITEM))
        LEFT JOIN #LastPO f
-              ON ltrim(rtrim(a.ITEM)) = ltrim(rtrim(f.ITEM))
+              ON rtrim(a.ITEM) = rtrim(f.ITEM)
        LEFT JOIN #StockLocations g
               ON ltrim(rtrim(c.ITEM)) = ltrim(rtrim(g.ITEM)) 
        LEFT JOIN #ItemContract h
               ON ltrim(rtrim(a.ITEM)) = ltrim(rtrim(h.ITEM)) AND ltrim(rtrim(d.VENDOR)) = ltrim(rtrim(h.VENDOR))
+		LEFT JOIN 
+			(select MANUF_CODE,max(DESCRIPTION) as [DESCRIPTION] from ICMANFCODE group by MANUF_CODE) icm
+              ON a.MANUF_CODE = icm.MANUF_CODE
+--where a.ITEM = '30003'
 order by a.ITEM
 
-
+--select * from bluebin.DimItem
 
 /*********************		DROP Temp Tables	*********************************/
 
