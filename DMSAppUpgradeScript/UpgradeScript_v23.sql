@@ -98,7 +98,23 @@ END
 --GO
 --ALTER TABLE qcn.QCN ADD InternalReference varchar(50)
 --GO
+if not exists(select * from sys.columns where name = 'ScanType' and object_id = (select object_id from sys.tables where name = 'ScanBatch'))
+BEGIN
+ALTER TABLE scan.ScanBatch ADD ScanType varchar (25)
+END
+GO
 
+if exists(select * from scan.ScanBatch where ScanType is null)
+BEGIN
+update scan.ScanBatch set ScanType = 'Order'
+END
+GO
+
+if exists(select * from sys.columns where name = 'ScanType' and object_id = (select object_id from sys.tables where name = 'ScanBatch'))
+BEGIN
+ALTER TABLE scan.ScanBatch ALTER COLUMN ScanType varchar (25) NOT NULL
+END
+GO
 
 if not exists(select * from sys.columns where name = 'GembaTier' and object_id = (select object_id from sys.tables where name = 'BlueBinUser'))
 BEGIN
@@ -249,6 +265,50 @@ update bluebin.Config set [Description] = 'Tableau Setting - Custom setting to o
 update bluebin.Config set [Description] = 'Tableau Setting - GLACCOUNT value that can be custom set in Tableu. Default=70' where ConfigName = 'GLSummaryAccountID'
 END
 GO
+
+if not exists(select * from bluebin.Config where ConfigType = 'Reports' and ConfigName like 'SC-%')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description]) VALUES
+('SC-Daily Management DB','1',1,getdate(),'Reports','Setting for whether to display the Daily Management DB'),
+('SC-Bin Activity','1',1,getdate(),'Reports','Setting for whether to display the BlueBin Activity Report'),
+('SC-Node Activity','1',1,getdate(),'Reports','Setting for whether to display the Node Activity Report'),
+('SC-Bin Velocity Report','1',1,getdate(),'Reports','Setting for whether to display the Bin Velocity Report'),
+('SC-Slow Bin Report','1',1,getdate(),'Reports','Setting for whether to display the Slow Bin Report'),
+('SC-BlueBin Par Master','1',1,getdate(),'Reports','Setting for whether to display the BlueBin Par Master Report'),
+('SC-Order Details','1',1,getdate(),'Reports','Setting for whether to display the Order Details Report'),
+('SC-Open Scans','1',1,getdate(),'Reports','Setting for whether to display the Open Scans Report'),
+('SC-Par Valuation','1',1,getdate(),'Reports','Setting for whether to display the Par Valuation Report'),
+('SC-Item Locator','1',1,getdate(),'Reports','Setting for whether to display the Item Locator Report'),
+('SC-Item Master','1',1,getdate(),'Reports','Setting for whether to display the Item Master Report')
+END
+
+if not exists(select * from bluebin.Config where ConfigType = 'Reports' and ConfigName like 'OP-%')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description]) VALUES
+('OP-Pick Line Volume','1',1,getdate(),'Reports','Setting for whether to display the Pick Line Volume Report'),
+('OP-Supply Spend','1',1,getdate(),'Reports','Setting for whether to display the Supply Spend Report'),
+('OP-Overall Line Volume','1',1,getdate(),'Reports','Setting for whether to display the Overall Line Volume Report'),
+('OP-Kanbans Adjusted','1',1,getdate(),'Reports','Setting for whether to display the Kanbans Adjusted Report'),
+('OP-Stat Calls','1',1,getdate(),'Reports','Setting for whether to display the Stat Calls Report'),
+('OP-Warehouse Detail','1',1,getdate(),'Reports','Setting for whether to display the Warehouse Size Report'),
+('OP-Warehouse Volume','1',1,getdate(),'Reports','Setting for whether to display the Warehouse Value Report'),
+('OP-Huddle Board','1',1,getdate(),'Reports','Setting for whether to display the Huddle Board Report'),
+('OP-QCN Dashboard','1',1,getdate(),'Reports','Setting for whether to display the QCN DB'),
+('OP-Gemba Dashboard','1',1,getdate(),'Reports','Setting for whether to display the Gemba DB')
+END
+
+if not exists(select * from bluebin.Config where ConfigType = 'Reports' and ConfigName like 'Src-%')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description]) VALUES
+('Src-Buyer Performance','1',1,getdate(),'Reports','Setting for whether to display the Buyer Performance DB'),
+('Src-Specials Performance','1',1,getdate(),'Reports','Setting for whether to display the Specials DB'),
+('Src-Supplier Performance','1',1,getdate(),'Reports','Setting for whether to display the Supplier Performance DB'),
+('Src-Cost Impact Calculator','1',1,getdate(),'Reports','Setting for whether to display the Item Cost Impact DB'),
+('Src-Open PO Report','1',1,getdate(),'Reports','Setting for whether to display the Open PO Report'),
+('Src-Supplier Spend Manager','1',1,getdate(),'Reports','Setting for whether to display the Supplier Spend Manager Report'),
+('Src-Sourcing Calendar','1',1,getdate(),'Reports','Setting for whether to display the Sourcing Calendar Report'),
+('Src-Cost Variance Dashboard','1',1,getdate(),'Reports','Setting for whether to display the Cost Variance DB')
+END
 
 if not exists(select * from bluebin.Config where ConfigName = 'TableauSiteName')  
 BEGIN
@@ -1078,6 +1138,100 @@ Print 'Table Adds Complete'
 --*************************************************************************************************************************************************
 --Sproc Updates
 --*************************************************************************************************************************************************
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanLinesReceive') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectScanLinesReceive
+GO
+
+--exec sp_SelectScanLinesReceive 1
+
+CREATE PROCEDURE sp_SelectScanLinesReceive
+@ScanBatchID int
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+select 
+sb.ScanBatchID,
+db.BinKey,
+db.BinSequence,
+rtrim(sb.LocationID) as LocationID,
+dl.LocationName as LocationName,
+sl.ItemID,
+di.ItemDescription,
+sl.Qty,
+sl.Line,
+sb.ScanDateTime as [DateScanned],
+case when sb.Extracted = 0 then 'No' Else 'Yes' end as Extracted
+
+from scan.ScanLine sl
+inner join scan.ScanBatch sb on sl.ScanBatchID = sb.ScanBatchID
+inner join bluebin.DimBin db on sb.LocationID = db.LocationID and sl.ItemID = db.ItemID
+inner join bluebin.DimItem di on sl.ItemID = di.ItemID
+inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
+where sl.ScanBatchID = @ScanBatchID and sl.Active = 1
+order by sl.Line
+
+
+
+END
+GO
+grant exec on sp_SelectScanLinesReceive to public
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertScanLineReceive') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_InsertScanLineReceive
+GO
+
+/* 
+exec sp_InsertScanLineReceive 1,'0001217','20',1
+exec sp_InsertScanLineReceive 1,'0001218','5',2
+exec sp_InsertScanLineReceive 1,'0002205','100',3
+*/
+
+CREATE PROCEDURE sp_InsertScanLineReceive
+@ScanBatchID int,
+@Item varchar(30),
+@Qty int,
+@Line int
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+if exists (select * from bluebin.DimItem where ItemID = @Item) 
+BEGIN
+insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extracted)
+	select 
+	@ScanBatchID,
+	@Line,
+	@Item,
+	@Qty,
+	1,--Active Default to Yes
+	getdate(),
+	0 --Extracted default to No
+END
+	ELSE
+	BEGIN
+	SELECT -1 -- Back out scan if there is an issue with the Item existing
+	delete from scan.ScanLine where ScanBatchID = @ScanBatchID
+	delete from scan.ScanBatch where ScanBatchID = @ScanBatchID
+	END
+
+END
+GO
+grant exec on sp_InsertScanLineReceive to public
+GO
+
+
 
 --*****************************************************
 --**************************SPROC**********************
@@ -2167,14 +2321,16 @@ GO
 
 
 
+
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanBatch') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_SelectScanBatch
 GO
 
---exec sp_SelectScanBatch '2016/04/27'
+--exec sp_SelectScanBatch '',''
 
 CREATE PROCEDURE sp_SelectScanBatch
-@ScanDate varchar(20)
+@ScanDate varchar(20),
+@Facility varchar(50)
 
 --WITH ENCRYPTION
 AS
@@ -2199,6 +2355,8 @@ inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
 inner join bluebin.BlueBinUser bbu on sb.BlueBinUserID = bbu.BlueBinUserID
 where sb.Active = 1 
 and convert(varchar,(convert(Date,sb.ScanDateTime)),111) LIKE '%' + @ScanDate + '%'  
+--and convert(varchar(4),df.FacilityID) +' - '+ df.FacilityName like '%' + @Facility + '%' 
+and sb.FacilityID like '%' + @Facility + '%' 
 
 group by 
 sb.ScanBatchID,
@@ -2215,8 +2373,6 @@ END
 GO
 grant exec on sp_SelectScanBatch to public
 GO
-
-
 
 
 
@@ -5740,6 +5896,7 @@ SET NOCOUNT ON
 
 	insert into @ConfigType (ConfigType) VALUES
 	('Tableau'),
+	('Reports'),
 	('DMS'),
 	('Interface'),
 	('Other')
@@ -5751,6 +5908,7 @@ END
 GO
 grant exec on sp_SelectConfigType to appusers
 GO
+
 
 
 
@@ -5924,6 +6082,184 @@ grant exec on sp_CleanLawsonTables to appusers
 GO
 
 Print 'SSP Sproc Add/Updates Complete'
+
+
+
+--*************************************************************************************************************************************************
+--Interface Sproc
+--*************************************************************************************************************************************************
+
+
+if exists (select * from dbo.sysobjects where id = object_id(N'xp_RQ500ScanBatchS') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure xp_RQ500ScanBatchS
+GO
+
+--exec xp_RQ500ScanBatchS ''
+
+CREATE PROCEDURE xp_RQ500ScanBatchS
+@Facility varchar(4)
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+--If there is nothing to extract skip to the end
+if not exists(select * from scan.ScanBatch where Extracted = 0) 
+BEGIN
+GOTO THEEND
+END
+
+--Declare all paramters and parameter table
+Declare @RQ500User varchar(100), @RQ500FromLoc varchar(5), @RQ500FromComp varchar(5), @RQ500Account varchar(6), @RQ500SubAccount varchar(4), @RQ500AccountCat varchar(5), @RQ500AccountUnit varchar(15)
+DECLARE @Batch TABLE (iid int identity (1,1) PRIMARY KEY,ScanBatchID int,FacilityID int,LocationID char(7),RQ500User varchar(100),Extracted int,ScanDateTime datetime,RQ500FromLoc varchar(5),RQ500FromComp varchar(4))
+declare @iid int, @ScanBatchID int
+
+--Set The REQUESTER for the batch to be a generic value in bluebin.Config if set
+select @RQ500User = ConfigValue from bluebin.Config where ConfigName = 'RQ500User'
+--Set the From Location for the requisition
+select @RQ500FromLoc = ConfigValue from bluebin.Config where ConfigName = 'RQ500FromLoc'
+--Set Company that is the source of the items.
+select @RQ500FromComp = ConfigValue from bluebin.Config where ConfigName = 'RQ500FromComp'
+
+--Set The Account for the GL for the PO
+select @RQ500Account = ConfigValue from bluebin.Config where ConfigName = 'RQ500Account'
+--Set the Account Category code (used for reporting on ERP)
+select @RQ500AccountCat = ConfigValue from bluebin.Config where ConfigName = 'RQ500AccountCat'
+--Set the Posting Account Unit
+select @RQ500AccountUnit = ConfigValue from bluebin.Config where ConfigName = 'RQ500AccountUnit'
+--Set the Sub Account for the general ledger for the req
+select @RQ500SubAccount = ConfigValue from bluebin.Config where ConfigName = 'RQ500SubAccount'
+
+
+--Create data set of all the Batches that need to be extracted
+insert into @Batch (ScanBatchID,FacilityID,LocationID,RQ500User,Extracted,ScanDateTime,RQ500FromLoc,RQ500FromComp) 
+select 
+	sb.ScanBatchID,
+	sb.FacilityID,
+	--sb.LocationID,  --Used for real Sprocs
+	REPLACE(sb.LocationID,'BB','DS') as LocationID,--Used for Testing in Demo
+	case 
+		when bu.ERPUser = '' or bu.ERPUser is null then 
+			case when @RQ500User = '' or @RQ500User is null then 'Invalid Requester' else @RQ500User end 
+			else bu.ERPUser end
+			,
+	sb.Extracted,
+	ScanDateTime,
+	@RQ500FromLoc,
+	@RQ500FromComp
+from scan.ScanBatch sb
+	left join bluebin.BlueBinUser bu on sb.BlueBinUserID = bu.BlueBinUserID 
+where sb.Extracted = 0 
+		and sb.ScanBatchID in (select ScanBatchID from scan.ScanLine where Extracted = 0)
+			and convert(varchar(4),FacilityID) like '%' + @Facility + '%'
+
+;
+	
+	--Create RQ500 Header out of the ScanBatch
+With C as (
+	select 
+	sb.ScanBatchID,1 as Line,
+	left((
+	'H'+																		--Record Type 1, 1
+	right((REPLICATE('0',4) + rtrim(convert(varchar(4),sb.FacilityID))),4)+		--Company 4, 2-5
+	REPLICATE('0',7)+															--Req Number 7, 6-12
+	REPLICATE('0',6)+															--LineNumber 6, 13-18
+	left(sb.RQ500User+SPACE(10),10)+											--Requester 10, 19-28
+	left(sb.LocationID+SPACE(5),5)+												--Req Location 5, 29-33
+	convert(varchar, sb.ScanDateTime, 112)+										--Req Delete Date 8, 34-41								
+	convert(varchar, sb.ScanDateTime, 112)+										--Creation Date 8, 42-49
+	right((REPLICATE('0',4) + rtrim(convert(varchar(4),rtrim(sb.RQ500FromComp)))),4)+--From Company 4, 50-53
+	left(sb.RQ500FromLoc+SPACE(5),5)+											--From Location 5, 54-58
+	SPACE(76)+																	--76 Spaces, 59-134
+	'N'+																		--Print ReqFI  Should we print Req.  Default to N 1, 135
+	SPACE(87)+																	--87 Spaces, 136-222
+	'01'+																		--Priority 2, 223-224, default it to 01
+	SPACE(16)+																	--16 Spaces, 225-240
+	left(@RQ500AccountCat+SPACE(5),5)+											--Accounting Category 5, 241-245
+	SPACE(32)+																	--32 Spaces, 246-277
+	left(@RQ500AccountUnit+SPACE(15),15)+										--Account Unit 15, 278-292
+	right((REPLICATE('0',6) + @RQ500Account),6)+								--Account 6, 293-298
+	right((REPLICATE('0',4) + @RQ500SubAccount),4)+								--Sub Account 4, 299-302
+	SPACE(320)+																	--320 Spaces, 303-622
+	'1'+																		--One Source One PO, 1, 623.  default it to 1
+	SPACE(115)+																	--115 Spaces, 624-738
+	'A'+																		--FUNCTION CODE, 1, 739.  default it to A
+	SPACE(503)+																	--503 Spaces, 740-1242
+	'00000000'+																	--Default Procedure Date, 8, 1243-1250
+	SPACE(382)+																	--382 Spaces, 1251-1632
+	'00000000'+																	--Default Birthdate, 8, 1633-1640
+	SPACE(2000)																	--Extra Spaces to fill out
+	),2000) as Content
+	from @Batch sb 
+	where sb.RQ500User <> 'Invalid Requester'
+	
+	UNION
+
+	--Create RQ500 Lines out of the ScanLines
+	select 
+	sb.ScanBatchID,Line+1 as Line,
+	left((
+	'L'+																		--Record Type 1, 1
+	right((REPLICATE('0',4) + rtrim(convert(varchar(4),sb.FacilityID))),4)+		--Company 4, 2-5
+	REPLICATE('0',7)+															--Req Number 7, 6-12 
+	right(REPLICATE('0',6)+rtrim(sl.Line),6)+									--LineNumber 6, 13-18
+	left(sl.ItemID+SPACE(32),32)+												--Item 32, 19-50
+	SPACE(1)+																	--ItemType 1, 51
+	SPACE(1)+																	--ServiceCode 1, 52
+	SPACE(30)+																	--Service Code Description 30, 53-82
+	right(REPLICATE('0',9)+rtrim(sl.Qty),9)+REPLICATE('0',4)+					--Quantity decimal 9,4, overall 13, 83-95
+	left(di.StockUOM+SPACE(4),4)+												--Entered UOM 4, 96-99
+	REPLICATE('0',18)+															--Transaction Cost, 100-117
+	SPACE(56)+																	--Space for Override Cst, 56, 118-173Create PO,Agreement,Vendor,VendorLocation,Purchase Classes,Buyer
+	right((REPLICATE('0',4) + rtrim(convert(varchar(4),rtrim(sb.RQ500FromComp)))),4)+		--From Company 4, 174-177
+	left(sb.RQ500FromLoc+SPACE(5),5)+												--From Location 5, 178-182
+	left(sb.LocationID+SPACE(5),5)+												--Req Location 5, 183-187
+	convert(varchar, sb.ScanDateTime, 112)+										--Req Delivery Date 8, 188-195
+	convert(varchar, sb.ScanDateTime+1, 112)+									--Late Delivery Date 8, 196-203
+	convert(varchar, sb.ScanDateTime, 112)+										--Creation Date 8, 204-211
+	SPACE(89)+																	--Spaces 89, 212-300
+	'01'+																		--Priority 2, 301-302, default it to 01
+	SPACE(80)+																	--80 Spaces, 303-382
+	left(@RQ500AccountUnit+SPACE(15),15)+										--Account Unit 15, 383-397
+	right((REPLICATE('0',6) + @RQ500Account),6)+								--Account 6, 398-403
+	right((REPLICATE('0',4) + @RQ500SubAccount),4)+								--Sub Account 4, 404-407
+	SPACE(122)+																	--Spaces 122, 408-529
+	left(@RQ500AccountCat+SPACE(5),5)+											--Accounting Category 5, 530-534
+	SPACE(42)+																	--Spaces 42, 535-576
+	'0000000000'+																--Asset Number 10, 577-586 default all zeroes
+	SPACE(27)+																	--Spaces 27,587-613
+	'0'+																		--Strategic Sourcing Event 1, 614. default to 0
+	SPACE(2000)																	--Extra Spaces to fill out	
+	),2000) as Content
+	from @Batch sb
+	inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
+	inner join bluebin.DimItem di on sl.ItemID = di.ItemID
+	where sl.Extracted = 0 and sb.RQ500User <> 'Invalid Requester' 
+	
+	) 
+	select Content from C order by ScanBatchID,Line
+	;
+	update scan.ScanBatch set Extracted = 1 where ScanBatchID in (select ScanBatchID from @Batch where RQ500User <> 'Invalid Requester')
+	update scan.ScanLine set Extracted = 1 where ScanBatchID  in (select ScanBatchID from @Batch where RQ500User <> 'Invalid Requester')
+THEEND:
+
+/*
+select * from scan.ScanBatch
+select * from scan.ScanLine
+select * from bluebin.DimLocation
+update scan.ScanBatch set Extracted = 0 where ScanBatchID in (10,11,12)
+update scan.ScanLine set Extracted = 0 where ScanBatchID in (10,11,12)
+exec xp_RQ500ScanBatchS ''
+declare @ScanBatchID int 
+select @ScanBatchID = min(ScanBatchID) from scan.ScanBatch where Active = 1 and Extracted = 0
+*/
+
+END
+GO
+
+grant exec on xp_RQ500ScanBatchS to BlueBin_RQ500User
+GO
+Print 'Interface Sproc Updates Complete'
 --*************************************************************************************************************************************************
 --Grant Exec
 --*************************************************************************************************************************************************

@@ -15,7 +15,7 @@ SET NOCOUNT ON
 SELECT DISTINCT 
 convert(varchar,(convert(Date,ScanDateTime)),111) as ScanDate
 from scan.ScanBatch
-WHERE Active = 1 --and convert(Date,ScanDateTime) = @ScanDate 
+WHERE Active = 1 and ScanType = 'Order'--and convert(Date,ScanDateTime) = @ScanDate 
 order by 1 desc
 
 END 

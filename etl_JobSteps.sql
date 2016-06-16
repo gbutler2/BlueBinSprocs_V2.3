@@ -24,6 +24,10 @@ insert into etl.JobSteps (StepNumber,StepName,StepProcedure,StepTable,ActiveFlag
 ('12','Sourcing','tb_Sourcing','tableau.Sourcing',0,getdate()),
 ('13','Contracts','tb_Contracts','tableau.Contracts',0,getdate()),
 ('8','Update Bin Status','etl_UpdateBinStatus','bluebin.DimBin',0,getdate()),
-('14','Warehouse Item','etl_DimWarehouseItem','bluebin.DimWarehouseItem',0,getdate())
+('14','Warehouse Item','etl_DimWarehouseItem','bluebin.DimWarehouseItem',0,getdate()),
+('15','DimFacility','etl_DimFacility','bluebin.DimFacility',0,getdate()),
+('16','BlueBinParMaster','etl_BlueBinParMaster','bluebin.BlueBinParMaster',0,getdate()),
+('17','DimBinHistory','etl_DimBinHistory','bluebin.DimBinHistory',0,getdate())
 END
 GO
+

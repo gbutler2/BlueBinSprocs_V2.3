@@ -16,6 +16,7 @@ SET NOCOUNT ON
 
 	insert into @ConfigType (ConfigType) VALUES
 	('Tableau'),
+	('Reports'),
 	('DMS'),
 	('Interface'),
 	('Other')

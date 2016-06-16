@@ -30,7 +30,7 @@ inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
 inner join bluebin.DimFacility df on sb.FacilityID = df.FacilityID
 inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
 inner join bluebin.BlueBinUser bbu on sb.BlueBinUserID = bbu.BlueBinUserID
-where sb.Active = 1 
+where sb.Active = 1 and ScanType = 'Order' 
 and convert(varchar,(convert(Date,sb.ScanDateTime)),111) LIKE '%' + @ScanDate + '%'  
 --and convert(varchar(4),df.FacilityID) +' - '+ df.FacilityName like '%' + @Facility + '%' 
 and sb.FacilityID like '%' + @Facility + '%' 

@@ -2,7 +2,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_ValidateMenus'
 drop procedure sp_ValidateMenus
 GO
 
---exec sp_ValidateMenus 'MENU-QCN'
+--exec sp_ValidateMenus 'SC-BlueBin Par Master'
 
 CREATE PROCEDURE [dbo].[sp_ValidateMenus]
 	@ConfigName NVARCHAR(50)

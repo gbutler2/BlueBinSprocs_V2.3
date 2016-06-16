@@ -1,11 +1,11 @@
 
-if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanLines') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure sp_SelectScanLines
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanLinesReceive') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectScanLinesReceive
 GO
 
---exec sp_SelectScanLines 3  select * from scan.ScanBatch
+--exec sp_SelectScanLinesReceive 1
 
-CREATE PROCEDURE sp_SelectScanLines
+CREATE PROCEDURE sp_SelectScanLinesReceive
 @ScanBatchID int
 
 --WITH ENCRYPTION
@@ -30,12 +30,12 @@ inner join scan.ScanBatch sb on sl.ScanBatchID = sb.ScanBatchID
 inner join bluebin.DimBin db on sb.LocationID = db.LocationID and sl.ItemID = db.ItemID
 inner join bluebin.DimItem di on sl.ItemID = di.ItemID
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
-where sl.ScanBatchID = @ScanBatchID and sl.Active = 1 and sb.ScanType = 'Order'
+where sl.ScanBatchID = @ScanBatchID and sl.Active = 1
 order by sl.Line
 
 
 
 END
 GO
-grant exec on sp_SelectScanLines to public
+grant exec on sp_SelectScanLinesReceive to public
 GO

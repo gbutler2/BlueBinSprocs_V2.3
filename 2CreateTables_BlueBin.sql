@@ -408,6 +408,50 @@ CREATE TABLE [bluebin].[DimBinHistory](
 END
 GO
 
+if not exists(select * from bluebin.Config where ConfigType = 'Reports' and ConfigName like 'SC-%')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description]) VALUES
+('SC-Daily Management DB','1',1,getdate(),'Reports','Setting for whether to display the Daily Management DB'),
+('SC-Bin Activity','1',1,getdate(),'Reports','Setting for whether to display the BlueBin Activity Report'),
+('SC-Node Activity','1',1,getdate(),'Reports','Setting for whether to display the Node Activity Report'),
+('SC-Bin Velocity Report','1',1,getdate(),'Reports','Setting for whether to display the Bin Velocity Report'),
+('SC-Slow Bin Report','1',1,getdate(),'Reports','Setting for whether to display the Slow Bin Report'),
+('SC-BlueBin Par Master','1',1,getdate(),'Reports','Setting for whether to display the BlueBin Par Master Report'),
+('SC-Order Details','1',1,getdate(),'Reports','Setting for whether to display the Order Details Report'),
+('SC-Open Scans','1',1,getdate(),'Reports','Setting for whether to display the Open Scans Report'),
+('SC-Par Valuation','1',1,getdate(),'Reports','Setting for whether to display the Par Valuation Report'),
+('SC-Item Locator','1',1,getdate(),'Reports','Setting for whether to display the Item Locator Report'),
+('SC-Item Master','1',1,getdate(),'Reports','Setting for whether to display the Item Master Report')
+END
+
+if not exists(select * from bluebin.Config where ConfigType = 'Reports' and ConfigName like 'OP-%')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description]) VALUES
+('OP-Pick Line Volume','1',1,getdate(),'Reports','Setting for whether to display the Pick Line Volume Report'),
+('OP-Supply Spend','1',1,getdate(),'Reports','Setting for whether to display the Supply Spend Report'),
+('OP-Overall Line Volume','1',1,getdate(),'Reports','Setting for whether to display the Overall Line Volume Report'),
+('OP-Kanbans Adjusted','1',1,getdate(),'Reports','Setting for whether to display the Kanbans Adjusted Report'),
+('OP-Stat Calls','1',1,getdate(),'Reports','Setting for whether to display the Stat Calls Report'),
+('OP-Warehouse Detail','1',1,getdate(),'Reports','Setting for whether to display the Warehouse Size Report'),
+('OP-Warehouse Volume','1',1,getdate(),'Reports','Setting for whether to display the Warehouse Value Report'),
+('OP-Huddle Board','1',1,getdate(),'Reports','Setting for whether to display the Huddle Board Report'),
+('OP-QCN Dashboard','1',1,getdate(),'Reports','Setting for whether to display the QCN DB'),
+('OP-Gemba Dashboard','1',1,getdate(),'Reports','Setting for whether to display the Gemba DB')
+END
+
+if not exists(select * from bluebin.Config where ConfigType = 'Reports' and ConfigName like 'Src-%')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description]) VALUES
+('Src-Buyer Performance','1',1,getdate(),'Reports','Setting for whether to display the Buyer Performance DB'),
+('Src-Specials Performance','1',1,getdate(),'Reports','Setting for whether to display the Specials DB'),
+('Src-Supplier Performance','1',1,getdate(),'Reports','Setting for whether to display the Supplier Performance DB'),
+('Src-Cost Impact Calculator','1',1,getdate(),'Reports','Setting for whether to display the Item Cost Impact DB'),
+('Src-Open PO Report','1',1,getdate(),'Reports','Setting for whether to display the Open PO Report'),
+('Src-Supplier Spend Manager','1',1,getdate(),'Reports','Setting for whether to display the Supplier Spend Manager Report'),
+('Src-Sourcing Calendar','1',1,getdate(),'Reports','Setting for whether to display the Sourcing Calendar Report'),
+('Src-Cost Variance Dashboard','1',1,getdate(),'Reports','Setting for whether to display the Cost Variance DB')
+END
+
 SET ANSI_PADDING OFF
 GO
 
