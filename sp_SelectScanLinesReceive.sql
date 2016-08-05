@@ -5,6 +5,12 @@ GO
 
 --exec sp_SelectScanLinesReceive 1
 
+/*
+select * from scan.ScanMatch
+select * from scan.ScanLine where ScanLineID = 25
+
+
+*/
 CREATE PROCEDURE sp_SelectScanLinesReceive
 @ScanBatchID int
 
@@ -13,29 +19,36 @@ AS
 BEGIN
 SET NOCOUNT ON
 select 
-sb.ScanBatchID,
+sbr.ScanBatchID,
 db.BinKey,
 db.BinSequence,
-rtrim(sb.LocationID) as LocationID,
+rtrim(sbr.LocationID) as LocationID,
 dl.LocationName as LocationName,
-sl.ItemID,
+slr.ItemID,
 di.ItemDescription,
-sl.Qty,
-sl.Line,
-sb.ScanDateTime as [DateScanned],
-case when sb.Extracted = 0 then 'No' Else 'Yes' end as Extracted
+slr.Qty,
+slo.Line,
+sbr.ScanDateTime as [DateScanned],
+bbu.LastName + ', ' + bbu.FirstName as ScannedBy
 
-from scan.ScanLine sl
-inner join scan.ScanBatch sb on sl.ScanBatchID = sb.ScanBatchID
-inner join bluebin.DimBin db on sb.LocationID = db.LocationID and sl.ItemID = db.ItemID
-inner join bluebin.DimItem di on sl.ItemID = di.ItemID
-inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
-where sl.ScanBatchID = @ScanBatchID and sl.Active = 1
-order by sl.Line
+from scan.ScanMatch sm
+inner join scan.ScanLine slr on sm.ScanLineReceiveID = slr.ScanLineID
+inner join scan.ScanLine slo on sm.ScanLineOrderID = slo.ScanLineID
+inner join scan.ScanBatch sbr on slr.ScanBatchID = sbr.ScanBatchID 
+inner join scan.ScanBatch sbo on slo.ScanBatchID = sbo.ScanBatchID 
+inner join bluebin.DimBin db on sbr.LocationID = db.LocationID and slr.ItemID = db.ItemID
+inner join bluebin.DimItem di on slr.ItemID = di.ItemID
+inner join bluebin.DimLocation dl on sbr.LocationID = dl.LocationID
+inner join bluebin.BlueBinUser bbu on sbr.BlueBinUserID = bbu.BlueBinUserID
+ 
+where slo.ScanBatchID = @ScanBatchID and slo.Active = 1
+order by slo.Line
 
-
+--11 --
 
 END
 GO
 grant exec on sp_SelectScanLinesReceive to public
 GO
+
+

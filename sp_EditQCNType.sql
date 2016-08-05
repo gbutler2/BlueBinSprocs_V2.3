@@ -8,13 +8,14 @@ CREATE PROCEDURE sp_EditQCNType
 @QCNTypeID int
 ,@Name varchar (255)
 ,@Active int
+,@Description varchar(100)
 
 
 --WITH ENCRYPTION
 AS
 BEGIN
 SET NOCOUNT ON
-	Update qcn.QCNType set Name = @Name,Active = @Active, LastUpdated = getdate() where QCNTypeID = @QCNTypeID
+	Update qcn.QCNType set Name = @Name,Active = @Active, LastUpdated = getdate(),Description = @Description where QCNTypeID = @QCNTypeID
 
 END
 

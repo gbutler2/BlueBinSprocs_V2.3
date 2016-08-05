@@ -9,6 +9,9 @@ CREATE PROCEDURE sp_InsertConesDeployed
 @FacilityID int
 ,@LocationID varchar (7)
 ,@ItemID varchar (32)
+,@ExpectedDelivery datetime
+,@SubProduct varchar(3)
+,@Details varchar(255)
 
 
 --WITH ENCRYPTION
@@ -17,8 +20,8 @@ BEGIN
 SET NOCOUNT ON
 
 
-insert into bluebin.ConesDeployed (FacilityID,LocationID,ItemID,ConeDeployed,Deployed,ConeReturned,Deleted,LastUpdated) VALUES
-(@FacilityID,@LocationID,@ItemID,1,getdate(),0,0,getdate()) 
+insert into bluebin.ConesDeployed (FacilityID,LocationID,ItemID,ConeDeployed,Deployed,ConeReturned,Deleted,LastUpdated,ExpectedDelivery,SubProduct,Details) VALUES
+(@FacilityID,@LocationID,@ItemID,1,getdate(),0,0,getdate(),@ExpectedDelivery,@SubProduct,@Details) 
 
 END
 

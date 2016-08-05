@@ -14,7 +14,8 @@ CREATE PROCEDURE sp_InsertUser
 @Email varchar(60),
 @Title varchar(50),
 @GembaTier varchar(50),
-@ERPUser varchar(10)
+@ERPUser varchar(60),
+@AssignToQCN int
 	
 --WITH ENCRYPTION
 AS
@@ -32,9 +33,9 @@ set @newpwdHash = convert(varbinary(max),rtrim(@RandomPassword))
 
 if not exists (select BlueBinUserID from bluebin.BlueBinUser where LOWER(UserLogin) = LOWER(@UserLogin))
 	BEGIN
-	insert into bluebin.BlueBinUser (UserLogin,FirstName,LastName,MiddleName,RoleID,MustChangePassword,PasswordExpires,[Password],Email,Active,LastUpdated,LastLoginDate,Title,GembaTier,ERPUser)
+	insert into bluebin.BlueBinUser (UserLogin,FirstName,LastName,MiddleName,RoleID,MustChangePassword,PasswordExpires,[Password],Email,Active,LastUpdated,LastLoginDate,Title,GembaTier,ERPUser,AssignToQCN)
 	VALUES
-	(LOWER(@UserLogin),@FirstName,@LastName,@MiddleName,@RoleID,1,@DefaultExpiration,(HASHBYTES('SHA1', @newpwdHash)),LOWER(@UserLogin),1,getdate(),getdate(),@Title,@GembaTier,@ERPUser)
+	(LOWER(@UserLogin),@FirstName,@LastName,@MiddleName,@RoleID,1,@DefaultExpiration,(HASHBYTES('SHA1', @newpwdHash)),LOWER(@UserLogin),1,getdate(),getdate(),@Title,@GembaTier,@ERPUser,@AssignToQCN)
 	;
 	SET @NewBlueBinUserID = SCOPE_IDENTITY()
 	set @message = 'New User Created - '+ LOWER(@UserLogin)

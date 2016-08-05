@@ -5,16 +5,24 @@ GO
 --exec sp_InsertQCN 
 
 CREATE PROCEDURE sp_InsertQCN
+@DateRequested datetime,
+@FacilityID int,
 @LocationID varchar(10),
 @ItemID varchar(32),
+@ClinicalDescription varchar(30),
 @Requester varchar(255),
-@Assigned varchar(255),
+@ApprovedBy varchar(255),
+@Assigned int,
+@QCNComplexity varchar(255),
 @QCNType varchar(255),
 @Details varchar(max),
 @Updates varchar(max),
 @QCNStatus varchar(255),
 @UserLogin varchar (60),
-@InternalReference varchar(50)
+@InternalReference varchar(50),
+@ManuNumName varchar(60),
+@Par int,
+@UOM varchar(10)
 
 
 --WITH ENCRYPTION
@@ -22,37 +30,56 @@ AS
 BEGIN
 SET NOCOUNT ON
 set @UserLogin = LOWER(@UserLogin)
-Declare @QCNID int
+Declare @QCNID int, @LoggedUserID int
+set @LoggedUserID = (select BlueBinUserID from bluebin.BlueBinUser where LOWER(UserLogin) = LOWER(@UserLogin))
 
 insert into [qcn].[QCN] 
-([LocationID],
+(FacilityID,
+[LocationID],
 	[ItemID],
+		[ClinicalDescription],
 		[RequesterUserID],
+		[ApprovedBy],
 			[AssignedUserID],
+				[QCNCID],
 				[QCNTypeID],
 					[Details],
 						[Updates],
+							[DateRequested],
 							[DateEntered],
 								[DateCompleted],
 									[QCNStatusID],
 										[Active],
 											[LastUpdated],
-												[InternalReference])
+												[InternalReference],
+												ManuNumName,
+													[LoggedUserID],
+													Par,
+													UOM)
 
 select 
+@FacilityID,
 @LocationID,
 case when @ItemID = '' then NULL else @ItemID end,
-(select [BlueBinResourceID] from [bluebin].[BlueBinResource] where LastName + ', ' + FirstName + ' (' + Login + ')' = @Requester),
-case when @Assigned = '' then NULL else (select [BlueBinResourceID] from [bluebin].[BlueBinResource] where LastName + ', ' + FirstName + ' (' + Login + ')' = @Assigned) end,
+@ClinicalDescription,
+@Requester,
+@ApprovedBy,
+case when @Assigned = '' then NULL else @Assigned end,
+@QCNComplexity,
 (select [QCNTypeID] from [qcn].[QCNType] where [Name] = @QCNType),
 @Details,
 @Updates,
+@DateRequested,
 getdate(),
 Case when @QCNStatus in('Rejected','Completed') then getdate() else NULL end,
 (select [QCNStatusID] from [qcn].[QCNStatus] where [Status] = @QCNStatus),
 1, --Active
 getdate(), --LastUpdated
-@InternalReference
+@InternalReference,
+@ManuNumName,
+@LoggedUserID,
+@Par,
+@UOM
 
 
 SET @QCNID = SCOPE_IDENTITY()

@@ -22,7 +22,12 @@ SET NOCOUNT ON
 
 if exists (select * from bluebin.DimItem where ItemID = @Item) 
 BEGIN
-insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extracted)
+
+declare @AutoExtractScans int
+select @AutoExtractScans = ConfigValue from bluebin.Config where ConfigName = 'AutoExtractScans'
+
+
+insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extract)
 	select 
 	@ScanBatchID,
 	@Line,
@@ -30,7 +35,7 @@ insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extra
 	@Qty,
 	1,--Active Default to Yes
 	getdate(),
-	0 --Extracted default to No
+	@AutoExtractScans --Extract, based on Config value from ConfigName = 'AutoExtractTrayScans'
 END
 	ELSE
 	BEGIN

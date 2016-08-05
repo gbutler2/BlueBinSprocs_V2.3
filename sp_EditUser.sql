@@ -18,7 +18,8 @@ CREATE PROCEDURE sp_EditUser
 @RoleName  varchar(30),
 @Title varchar(50),
 @GembaTier varchar(50),
-@ERPUser varchar(10)
+@ERPUser varchar(60),
+@AssignToQCN int
 
 
 --WITH ENCRYPTION
@@ -42,7 +43,8 @@ IF (@Password = '' or @Password is null)
         RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName),
 		Title = @Title,
 		GembaTier = @GembaTier,
-		ERPUser = @ERPUser
+		ERPUser = @ERPUser,
+		AssignToQCN = @AssignToQCN
 		Where BlueBinUserID = @BlueBinUserID
 	END
 	ELSE
@@ -60,7 +62,8 @@ IF (@Password = '' or @Password is null)
         RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName),
 		Title = @Title,
 		GembaTier = @GembaTier,
-		ERPUser = @ERPUser
+		ERPUser = @ERPUser,
+		AssignToQCN = @AssignToQCN
 		Where BlueBinUserID = @BlueBinUserID
 	END
 

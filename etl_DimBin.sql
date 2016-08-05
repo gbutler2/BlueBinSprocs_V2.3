@@ -10,7 +10,7 @@ CREATE PROCEDURE etl_DimBin
 
 AS
 
---exec etl_DimBin
+--exec etl_DimBin select * from bluebin.DimBin
 /***************************		DROP DimBin		********************************/
 BEGIN TRY
     DROP TABLE bluebin.DimBin
@@ -78,7 +78,7 @@ c.LAST_ISS_COST
 INTO   #ItemStore
 FROM   ITEMLOC i
 left join (select ITEMLOC.ITEM,max(ITEMLOC.LAST_ISS_COST) as LAST_ISS_COST from ITEMLOC
-				inner join (select ITEM,max(LAST_ISSUE_DT) as t from ITEMLOC where ITEM = '1915' group by ITEM) cost on ITEMLOC.ITEM = cost.ITEM and ITEMLOC.LAST_ISSUE_DT = cost.t
+				inner join (select ITEM,max(LAST_ISSUE_DT) as t from ITEMLOC group by ITEM) cost on ITEMLOC.ITEM = cost.ITEM and ITEMLOC.LAST_ISSUE_DT = cost.t
 				group by ITEMLOC.ITEM ) c on i.ITEM = c.ITEM
 WHERE  i.LOCATION in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')  and i.ACTIVE_STATUS = 'A'  
 
@@ -99,12 +99,17 @@ SELECT Row_number()
            ITEMLOC.ITEM                                                                               AS ItemID,
            ITEMLOC.LOCATION                                                                           AS LocationID,
            PREFER_BIN                                                                                 AS BinSequence,
-		   	CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN LEFT(PREFER_BIN, 2) ELSE LEFT(PREFER_BIN, 1) END as BinCart,
-			CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN SUBSTRING(PREFER_BIN, 3, 1) ELSE SUBSTRING(PREFER_BIN, 2,1) END as BinRow,
-			CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN SUBSTRING (PREFER_BIN,4,2) ELSE SUBSTRING(PREFER_BIN, 3,2) END as BinPosition,
-           CASE
-             WHEN PREFER_BIN LIKE 'CARD%' THEN 'WALL'
-             ELSE RIGHT(PREFER_BIN, 3)
+		   		   	CASE WHEN ISNUMERIC(left(PREFER_BIN,1))=1 then LEFT(PREFER_BIN,2) 
+				else CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN LEFT(PREFER_BIN, 2) ELSE LEFT(PREFER_BIN, 1) END END as BinCart,
+			CASE WHEN ISNUMERIC(left(PREFER_BIN,1))=1 then SUBSTRING(PREFER_BIN, 3, 1) 
+				else CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN SUBSTRING(PREFER_BIN, 3, 1) ELSE SUBSTRING(PREFER_BIN, 2,1) END END as BinRow,
+			CASE WHEN ISNUMERIC(left(PREFER_BIN,1))=1 then SUBSTRING(PREFER_BIN, 4, 2)
+				else CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN SUBSTRING (PREFER_BIN,4,2) ELSE SUBSTRING(PREFER_BIN, 3,2) END END as BinPosition,	
+			CASE
+				WHEN PREFER_BIN LIKE 'CARD%' THEN 'WALL'
+					ELSE 
+						CASE WHEN ISNUMERIC(left(PREFER_BIN,1))=1 then RIGHT(PREFER_BIN,2) 
+							else CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN RIGHT(PREFER_BIN, 2) ELSE RIGHT(PREFER_BIN, 3) END END
            END                                                                                        AS BinSize,
            UOM                                                                                        AS BinUOM,
            REORDER_POINT                                                                              AS BinQty,

@@ -78,24 +78,28 @@ WHERE  b.PO_DATE >= (select ConfigValue from bluebin.Config where ConfigName = '
 		--AND b.PO_RELEASE = 0
        AND a.CXL_QTY = 0
 	   
-	   
+	   --and a.PO_NUMBER like '%380479%'
 
 
 --#tmpMMDIST
-SELECT DOC_NUMBER    AS PO_NUMBER,
-       LINE_NBR,
+SELECT a.DOC_NUMBER    AS PO_NUMBER,
+       a.LINE_NBR,
        a.ACCT_UNIT,
        b.DESCRIPTION AS ACCT_UNIT_NAME
 INTO #tmpMMDIST
 FROM   MMDIST a
+inner join (select COMPANY,DOC_NUMBER,LINE_NBR,max(LINE_SEQ) as LINE_SEQ from MMDIST WHERE  SYSTEM_CD = 'PO' AND DOC_TYPE = 'PT' group by COMPANY,DOC_NUMBER,LINE_NBR) sq on a.COMPANY = sq.COMPANY and a.DOC_NUMBER = sq.DOC_NUMBER and a.LINE_NBR = sq.LINE_NBR and a.LINE_SEQ = sq.LINE_SEQ
        LEFT JOIN GLNAMES b
               ON a.COMPANY = b.COMPANY
                  AND a.ACCT_UNIT = b.ACCT_UNIT
 WHERE  SYSTEM_CD = 'PO'
        AND DOC_TYPE = 'PT'
-       AND DOC_NUMBER IN (SELECT PO_NUMBER
+       AND a.DOC_NUMBER IN (SELECT PO_NUMBER
                           FROM   PURCHORDER
                           WHERE  PO_DATE >= (select ConfigValue from bluebin.Config where ConfigName = 'PO_DATE'))
+						  --and a.DOC_NUMBER like '%380479%'
+						  --and a.DOC_NUMBER like '%389266%' order by 2
+
 
 --#tmpPOStatus
 SELECT Row_number()
@@ -211,5 +215,7 @@ WHERE StepName = 'Sourcing'
 GO
 grant exec on tb_Sourcing to public
 GO
+
+
 
 

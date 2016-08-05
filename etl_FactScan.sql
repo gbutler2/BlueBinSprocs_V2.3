@@ -39,7 +39,7 @@ INTO #ICTRANS
 FROM   ICTRANS a
        INNER JOIN bluebin.DimLocation b
                ON a.FROM_TO_LOC = b.LocationID 
-WHERE b.BlueBinFlag = 1 and DOCUMENT not like '%[A-Z]%'
+WHERE b.BlueBinFlag = 1 and DOCUMENT not like '%[A-Z]%' and DOCUMENT not like '%/%'
 --and DOCUMENT like '%270943%'
 group by 
 COMPANY,
@@ -208,7 +208,7 @@ SELECT a.Scanseq,
        END                     AS HotScan,
        CASE
          WHEN a.OrderDate < COALESCE(b.OrderCloseDate, b.OrderCancelDate, Getdate())
-              AND a.ScanHistseq > 2 THEN 1
+              AND a.ScanHistseq > (select ConfigValue + 1 from bluebin.Config where ConfigName = 'ScanThreshold') THEN 1
          ELSE 0
        END                     AS StockOut
 INTO   bluebin.FactScan

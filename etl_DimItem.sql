@@ -34,6 +34,8 @@ END Catch
 
 
 /**************		CREATE Temp Tables			*******************/
+Declare @UseClinicalDescription int
+select @UseClinicalDescription = ConfigValue from bluebin.Config where ConfigName = 'UseClinicalDescription'       
 
 SELECT ITEM,max(ClinicalDescription) as ClinicalDescription
 INTO   #ClinicalDescriptions
@@ -41,16 +43,21 @@ FROM
 (
 SELECT 
 	a.ITEM,
-	case 
-		when b.ClinicalDescription is null or b.ClinicalDescription = ''  then
-		case
-			when a.USER_FIELD3 is null or a.USER_FIELD3 = ''  then
-			case	
-				when a.USER_FIELD1 is null or a.USER_FIELD1 = '' then '*NEEDS*' 
-			else a.USER_FIELD1 end
-		else a.USER_FIELD3 end
-	else b.ClinicalDescription		
-		end	as ClinicalDescription
+		case when @UseClinicalDescription = 1 then
+		case 
+			when b.ClinicalDescription is null or b.ClinicalDescription = ''  then
+			case
+				when a.USER_FIELD3 is null or a.USER_FIELD3 = ''  then
+				case	
+					when a.USER_FIELD1 is null or a.USER_FIELD1 = '' then 
+					case 
+						when c.DESCRIPTION is null or c.DESCRIPTION = '' then '*NEEDS*'
+					else rtrim(c.DESCRIPTION) + '*' end
+				else a.USER_FIELD1 end
+			else a.USER_FIELD3 end
+		else b.ClinicalDescription end	
+	else c.DESCRIPTION
+	end as ClinicalDescription
 
 FROM 
 (SELECT 
@@ -68,7 +75,9 @@ FROM ITEMLOC
 WHERE LOCATION IN (SELECT [ConfigValue] FROM [bluebin].[Config] WHERE  [ConfigName] = 'LOCATION' AND Active = 1) AND LEN(LTRIM(USER_FIELD3)) > 0
 ) b
 ON ltrim(rtrim(a.ITEM)) = ltrim(rtrim(b.ITEM))
+left join ITEMMAST c on ltrim(rtrim(a.ITEM)) = ltrim(rtrim(c.ITEM))
 ) a
+
 Group by ITEM
 	  
 
@@ -141,9 +150,7 @@ where a.REPLENISH_PRI = 1
 
 
 /*********************		CREATE DimItem		**************************************/
-Declare @UseClinicalDescription int
-select @UseClinicalDescription = ConfigValue from bluebin.Config where ConfigName = 'UseClinicalDescription'         
-		
+
 
 SELECT Row_number()
          OVER(
@@ -153,8 +160,12 @@ SELECT Row_number()
 	   a.DESCRIPTION2					   AS ItemDescription2,
        case 
 		when @UseClinicalDescription = 1 
-		then e.ClinicalDescription
-		else a.DESCRIPTION end             AS ItemClinicalDescription,
+		then 
+			case 
+				when e.ClinicalDescription is null 
+				then rtrim(a.DESCRIPTION) + '*' 
+				else e.ClinicalDescription end
+		else rtrim(a.DESCRIPTION) + '*' end             AS ItemClinicalDescription,
        a.ACTIVE_STATUS                     AS ActiveStatus,
        icm.DESCRIPTION                     AS ItemManufacturer, --b.DESCRIPTION
 	   --a.MANUF_NBR                         AS ItemManufacturer, --b.DESCRIPTION
@@ -192,7 +203,7 @@ FROM   ITEMMAST a
 --where a.ITEM = '30003'
 order by a.ITEM
 
---select * from bluebin.DimItem
+select * from bluebin.DimItem 
 
 /*********************		DROP Temp Tables	*********************************/
 

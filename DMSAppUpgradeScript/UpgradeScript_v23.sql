@@ -98,6 +98,185 @@ END
 --GO
 --ALTER TABLE qcn.QCN ADD InternalReference varchar(50)
 --GO
+
+
+--2.3
+/*
+--*******************************************************************************************************************************************
+--*******************************************************************************************************************************************
+--MAJOR QCN CHANGE --Run this the first time you run the upgrade
+--*******************************************************************************************************************************************
+--*******************************************************************************************************************************************
+
+
+
+
+if not exists(select * from sys.columns where name = 'Description' and object_id = (select object_id from sys.tables where name = 'QCNType'))
+BEGIN
+ALTER TABLE qcn.QCNType ADD Description varchar(100)
+END
+
+if not exists(select * from sys.columns where name = 'Description' and object_id = (select object_id from sys.tables where name = 'QCNStatus'))
+BEGIN
+ALTER TABLE qcn.QCNStatus ADD Description varchar(100)
+END
+
+if not exists(select * from sys.columns where name = 'QCNCID' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ALTER COLUMN RequesterUserID varchar(65)
+END
+
+if not exists(select * from sys.columns where name = 'QCNCID' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ADD QCNCID int
+END
+
+if not exists(select * from sys.columns where name = 'FacilityID' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ADD FacilityID int
+END
+
+
+if not exists(select * from sys.columns where name = 'DateRequested' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ADD DateRequested datetime
+END
+
+
+if not exists(select * from sys.columns where name = 'Par' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ADD Par int
+END
+
+
+if not exists(select * from sys.columns where name = 'UOM' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ADD [UOM] varchar(10);
+END
+
+
+if not exists(select * from sys.columns where name = 'ApprovedBy' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ADD [ApprovedBy] varchar(65);
+END
+
+
+if not exists(select * from sys.columns where name = 'LoggedUserID' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ADD [LoggedUserID] int;
+END
+
+
+if not exists(select * from sys.columns where name = 'ManuNumName' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ADD [ManuNumName] varchar(60);
+END
+
+
+if not exists(select * from sys.columns where name = 'ClinicalDescription' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ADD [ClinicalDescription] varchar(255);
+END
+
+
+if not exists(select * from sys.columns where name = 'AssignToQCN' and object_id = (select object_id from sys.tables where name = 'BlueBinUser'))
+BEGIN
+ALTER TABLE bluebin.BlueBinUser ADD [AssignToQCN] int;
+END
+
+
+
+--updating existing values
+update qcn.QCN set QCNCID = 2
+
+update qcn.QCN set FacilityID = a.LocationFacility from (select distinct LocationID as L, LocationFacility from bluebin.DimLocation where BlueBinFlag = 1 and ACTIVE_STATUS = 'A') a where LocationID = a.L
+update qcn.QCN set DateRequested = DateEntered
+update qcn.QCN set UOM = 'EA'
+update qcn.QCN set RequesterUserID = a.Name from (select BlueBinResourceID,LastName + ', ' + FirstName as Name from bluebin.BlueBinResource) a where RequesterUserID = a.BlueBinResourceID
+update qcn.QCN set LoggedUserID = 1
+update qcn.QCN set ClinicalDescription = a.ItemD from (select ItemID as I,ItemDescription as ItemD from bluebin.DimItem) a where ItemID = a.I
+update bluebin.BlueBinUser set AssignToQCN = 0
+update bluebin.BlueBinUser set AssignToQCN = 1 where RoleID in (select RoleID from bluebin.BlueBinRoles where RoleName like '%BlueBelt%')
+update qcn.QCN set Par = a.P from (select ItemID as I,LocationID as L, BinQty as P from bluebin.DimBin) a where ItemID = a.I and LocationID = a.L
+update qcn.QCN set UOM = a.U from (select ItemID as I,LocationID as L, BinUOM as U from bluebin.DimBin) a where ItemID = a.I and LocationID = a.L
+update qcn.QCN set AssignedUserID = z.ID from 
+(select q.QCNID as Q,a.BlueBinUserID as ID,b.LastName as L,b.FirstName as F 
+		from qcn.QCN q
+			inner join bluebin.BlueBinResource b on q.AssignedUserID = b.BlueBinResourceID
+			left join bluebin.BlueBinUser a on b.FirstName = a.FirstName and b.LastName = a.LastName) z where QCNID = z.Q
+
+--Update QCN Types
+--select * from qcn.QCNType
+insert into qcn.QCNType select 'REMOVE','1',getdate(),''
+insert into qcn.QCNType select 'MODIFY','1',getdate(),''
+update qcn.QCN set QCNTypeID = (Select QCNTypeID from qcn.QCNType where Name = 'MODIFY') where QCNTypeID in (Select QCNTypeID from qcn.QCNType where Name in('CHANGE','UPDATE'))
+update qcn.QCN set QCNTypeID = (Select QCNTypeID from qcn.QCNType where Name = 'REMOVE') where QCNTypeID in (Select QCNTypeID from qcn.QCNType where Name in('DELETE'))
+delete from qcn.QCNType where Name in ('CHANGE','UPDATE','DELETE')
+
+--Update QCN Statuses
+--select * from qcn.QCNStatus
+insert into qcn.QCNStatus (Status,Active,LastUpdated,Description) VALUES
+('NeedsMoreInfo','1',getdate(),'Requester/clinical/other clarification.'),
+('AwaitingApproval','1',getdate(),'New items only, e.g. Value Analysis, Product Standards, or other new product committee process.'),
+('InFileMaintenance','1',getdate(),'New ERP # or other item activation steps.')
+
+update qcn.QCNStatus set LastUpdated = getdate(),Description = 'QCN is rejected.  This will remove the record off the Live board.' where Status = 'Rejected'
+update qcn.QCNStatus set LastUpdated = getdate(),Description = 'QCN is done.  This will remove the record off the Live board.' where Status = 'Completed'
+update qcn.QCNStatus set LastUpdated = getdate(),Status = 'New/NotStarted', Description = 'Logged, not yet evaluated for next steps.' where Status = 'New'
+update qcn.QCNStatus set LastUpdated = getdate(),Status = 'InProgress/Approved', Description = 'No additional support needed, QCN will be completed within 10 working days.' where Status = 'InProgress'
+
+update qcn.QCN set LastUpdated = getdate(),QCNStatusID = (Select QCNStatusID from qcn.QCNStatus where Status = 'NeedsMoreInfo') where QCNStatusID in (Select QCNStatusID from qcn.QCNStatus where Status in('OnHold','FutureVersion','InReview'))
+
+delete from qcn.QCNStatus where Status in ('OnHold','FutureVersion','InReview')
+
+
+--setting new columns not null
+ALTER TABLE qcn.QCN ALTER COLUMN QCNCID int not null
+ALTER TABLE qcn.QCN ALTER COLUMN FacilityID int not null
+ALTER TABLE qcn.QCN ALTER COLUMN DateRequested datetime not null
+ALTER TABLE qcn.QCN ALTER COLUMN LoggedUserID int not null
+ALTER TABLE bluebin.BlueBinUser ALTER COLUMN AssignToQCN int not null
+
+
+
+
+--*******************************************************************************************************************************************
+--*******************************************************************************************************************************************
+--END MAJOR QCN CHANGE
+--*******************************************************************************************************************************************
+--*******************************************************************************************************************************************
+*/
+if not exists(select * from sys.columns where name = 'Details' and object_id = (select object_id from sys.tables where name = 'ConesDeployed'))
+BEGIN
+ALTER TABLE bluebin.ConesDeployed ADD Details varchar (255)
+END
+GO
+if not exists(select * from sys.columns where name = 'SubProduct' and object_id = (select object_id from sys.tables where name = 'ScanLine'))
+BEGIN
+ALTER TABLE bluebin.ConesDeployed ADD SubProduct varchar (3)
+END
+GO
+if not exists(select * from sys.columns where name = 'ExpectedDelivery' and object_id = (select object_id from sys.tables where name = 'ScanLine'))
+BEGIN
+update bluebin.ConesDeployed set SubProduct = 'No'
+END
+GO
+if not exists(select * from sys.columns where name = 'ExpectedDelivery' and object_id = (select object_id from sys.tables where name = 'ScanLine'))
+BEGIN
+ALTER TABLE bluebin.ConesDeployed ADD ExpectedDelivery datetime
+END
+GO
+if exists(select * from sys.columns where name = 'SubProduct' and object_id = (select object_id from sys.tables where name = 'ScanLine'))
+BEGIN
+ALTER TABLE bluebin.ConesDeployed ALTER COLUMN SubProduct varchar (3) not null
+END
+GO
+
+if not exists(select * from sys.columns where name = 'Bin' and object_id = (select object_id from sys.tables where name = 'ScanLine'))
+BEGIN
+ALTER TABLE scan.ScanLine ADD Bin varchar (2)
+END
+
 if not exists(select * from sys.columns where name = 'ScanType' and object_id = (select object_id from sys.tables where name = 'ScanBatch'))
 BEGIN
 ALTER TABLE scan.ScanBatch ADD ScanType varchar (25)
@@ -124,7 +303,7 @@ GO
 
 if not exists(select * from sys.columns where name = 'ERPUser' and object_id = (select object_id from sys.tables where name = 'BlueBinUser'))
 BEGIN
-ALTER TABLE bluebin.BlueBinUser ADD [ERPUser] varchar(10);
+ALTER TABLE bluebin.BlueBinUser ADD [ERPUser] varchar(60);
 END
 GO
 
@@ -139,6 +318,15 @@ BEGIN
 ALTER TABLE bluebin.BlueBinUser ADD [Title] varchar(50);
 END
 GO
+
+if not exists (select * from bluebin.TrainingModule where ModuleName like '%Belt%')
+BEGIN
+insert into bluebin.TrainingModule (ModuleName,ModuleDescription,Active,Required,LastUpdated) VALUES
+('Green Belt Certification','Green Belt Certification',1,0,getdate()),
+('Blue Belt Certification','Blue Belt Certification',1,0,getdate()),
+('Black Belt Certification','Black Belt Certification',1,0,getdate())
+END
+
 
 if exists (select * from bluebin.BlueBinOperations where [Description] is null)
 BEGIN
@@ -236,33 +424,31 @@ GO
 --*******************
 --Config Stuff
 
-
-
-if exists(select * from sys.columns where name = 'Description' and object_id = (select object_id from sys.tables where name = 'Config'))
+if exists(select * from scan.ScanBatch where ScanType = 'Order')  
 BEGIN
-update bluebin.Config set [Description] = 'Value in the BlueBinHardware Database for matching invoices. Default=Demo' where ConfigName = 'BlueBinHardwareCustomer'
-update bluebin.Config set [Description] = 'Time offset in hours from the server time for custom interface changing. Default=0' where ConfigName = 'TimeOffset'
-update bluebin.Config set [Description] = 'Linked image on the Front Page.  Should be NameofHospital_Logo.png. Default=BlueBin_Logo.png' where ConfigName = 'CustomerImage'
-update bluebin.Config set [Description] = 'Tableau Setting - REQLINE.REQLOCATION Value that is used for pulling locations in to the Dashboard.  Should be 2 characters.  Default=BB' where ConfigName = 'REQ_LOCATION'
-update bluebin.Config set [Description] = 'Current Version of the Application.  Default=current version' where ConfigName = 'Version'
-update bluebin.Config set [Description] = 'Default value for password expiration when user is created. Default=90' where ConfigName = 'PasswordExpires'
-update bluebin.Config set [Description] = 'Name of the Site app hosted in dms.bluebin.com. Default=Demo' where ConfigName = 'SiteAppURL'
-update bluebin.Config set [Description] = 'Tableau Setting - URL for the Tableau Workbook for the site. Default=/bluebinanalytics/views/DemoV22/' where ConfigName = 'TableauURL'
-update bluebin.Config set [Description] = 'Tableau Setting - Default setting for the Warehouse for the client in their ERP. Default=STORE' where ConfigName = 'LOCATION'
-update bluebin.Config set [Description] = 'Tableau Setting - Will limit the return of rows to one company for ERPs. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'SingleCompany'
-update bluebin.Config set [Description] = 'Title that will auto create from Resources an entry in the Training table. Default=Tech' where ConfigName = 'TrainingTitle'
-update bluebin.Config set [Description] = 'Dashboard Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'MENU-Dashboard'
-update bluebin.Config set [Description] = 'QCN Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'MENU-QCN'
-update bluebin.Config set [Description] = 'Gemba Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'MENU-Gemba'
-update bluebin.Config set [Description] = 'Hardware Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'MENU-Hardware'
-update bluebin.Config set [Description] = 'Scanning Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'MENU-Scanning'
-update bluebin.Config set [Description] = 'Other Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'MENU-Other'
-update bluebin.Config set [Description] = 'Dashboard Supply Chain Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'MENU-Dashboard-SupplyChain'
-update bluebin.Config set [Description] = 'Dashboard Sourcing Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'MENU-Dashboard-Sourcing'
-update bluebin.Config set [Description] = 'Dashboard Ops Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'MENU-Dashboard-Ops'
-update bluebin.Config set [Description] = 'HuddleBoard Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)' where ConfigName = 'MENU-Dashboard-HuddleBoard'
-update bluebin.Config set [Description] = 'Tableau Setting - Custom setting to only pull POs from a certain date. Format as MM/DD/YYYY Default=1/1/2015' where ConfigName = 'PO_DATE'
-update bluebin.Config set [Description] = 'Tableau Setting - GLACCOUNT value that can be custom set in Tableu. Default=70' where ConfigName = 'GLSummaryAccountID'
+update scan.ScanBatch set ScanType = 'ScanOrder' where ScanType = 'Order'
+END
+
+
+if not exists(select * from bluebin.Config where ConfigName = 'AutoExtractTrayScans')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'AutoExtractTrayScans','0',1,getdate(),'Interface','Automaticaly create an extract for Scans that originate from the RFID Tray.  Default to No'
+END
+GO
+
+
+if not exists(select * from bluebin.Config where ConfigName = 'AutoExtractScans')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'AutoExtractScans','0',1,getdate(),'Interface','Automaticaly create an extract for Scans that originate from Scanning.  Default to No'
+END
+GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'ScanThreshold')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'ScanThreshold','1',1,getdate(),'Tableau','Number of Scans to ignore in calculations for Bin Status and first Stockouts'
 END
 GO
 
@@ -333,6 +519,13 @@ select 'GembaShadowTitle','Tech',1,getdate(),'DMS','BlueBin Resource Title that 
 
 insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
 select 'GembaShadowTitle','Strider',1,getdate(),'DMS','BlueBin Resource Title that is available in Shadowed User section of Gemba Audit'
+END
+GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'MENU-Scanning-Receive')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'MENU-Scanning-Receive','0',1,getdate(),'DMS','Receive Scanning Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)'
 END
 GO
 
@@ -509,6 +702,9 @@ insert into bluebin.TrainingModule (ModuleName,ModuleDescription,Active,Required
 ('SOP 3008','SOP 3008',1,1,getdate()),
 ('SOP 3009','SOP 3009',1,1,getdate()),
 ('SOP 3010','SOP 3010',1,1,getdate()),
+('Green Belt Certification','Green Belt Certification',1,0,getdate()),
+('Blue Belt Certification','Blue Belt Certification',1,0,getdate()),
+('Black Belt Certification','Black Belt Certification',1,0,getdate()),
 ('DMS App Training','Training on the use of Gemba, QCN, and Dashboard as applicable',1,0,getdate())
 ;
 END
@@ -686,6 +882,29 @@ GO
 --*****************************************************
 --**************************NEWTABLE**********************
 
+/****** Object:  Table [scan].[ScanExtract]     ******/
+
+if not exists (select * from sys.tables where name = 'ScanExtract')
+BEGIN
+CREATE TABLE [scan].[ScanExtract](
+	[ScanExtractID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	[ScanBatchID] int NOT NULL,
+	[ScanLineID] int NOT NULL,
+	[ScanExtractDateTime] datetime not null
+)
+
+ALTER TABLE [scan].[ScanExtract] WITH CHECK ADD FOREIGN KEY([ScanLineID])
+REFERENCES [scan].[ScanLine] ([ScanLineID])
+
+ALTER TABLE [scan].[ScanExtract] WITH CHECK ADD FOREIGN KEY([ScanBatchID])
+REFERENCES [scan].[ScanLine] ([ScanLineID])
+
+END
+GO
+
+--*****************************************************
+--**************************NEWTABLE**********************
+
 /****** Object:  Table [scan].[ScanBatch]     ******/
 
 if not exists (select * from sys.tables where name = 'ScanBatch')
@@ -694,9 +913,10 @@ CREATE TABLE [scan].[ScanBatch](
 	[ScanBatchID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
 	[FacilityID] int NOT NULL,
 	[LocationID] char(10) NOT NULL,
-	[BlueBinUserID] int NOT NULL,
+	[BlueBinUserID] int NULL,
 	[Active] int NOT NULL,
-	[Extracted] int NOT NULL,
+	[Extract] int NOT NULL,
+	[ScanType] varchar(50) NOT NULL,
 	[ScanDateTime] datetime not null
 )
 END
@@ -714,9 +934,10 @@ CREATE TABLE [scan].[ScanLine](
 	[ScanBatchID] int NOT NULL,
 	[Line] int NOT NULL,
 	[ItemID] char (32) NOT NULL,
+	[Bin] varchar(2) NULL,
 	[Qty] int NOT NULL,
 	[Active] int NOT NULL,
-	[Extracted] int NOT NULL,
+	[Extract] int NOT NULL,
     [ScanDateTime] datetime NOT NULL
 )
 
@@ -726,6 +947,27 @@ REFERENCES [scan].[ScanBatch] ([ScanBatchID])
 END
 GO
 
+--*****************************************************
+--**************************NEWTABLE**********************
+
+if not exists (select * from sys.tables where name = 'ScanMatch')
+BEGIN
+CREATE TABLE [scan].[ScanMatch](
+	[ScanMatchID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	[ScanLineOrderID] int NOT NULL,
+	[ScanLineReceiveID] int NOT NULL,
+	[Qty] int NOT NULL,
+	[ScanDateTime] datetime not null
+)
+
+ALTER TABLE [scan].[ScanMatch] WITH CHECK ADD FOREIGN KEY([ScanLineOrderID])
+REFERENCES [scan].[ScanLine] ([ScanLineID])
+
+ALTER TABLE [scan].[ScanMatch] WITH CHECK ADD FOREIGN KEY([ScanLineReceiveID])
+REFERENCES [scan].[ScanLine] ([ScanLineID])
+
+END
+GO
 
 --*****************************************************
 --**************************NEWTABLE**********************
@@ -856,7 +1098,8 @@ CREATE TABLE [bluebin].[BlueBinUser](
 	[PasswordExpires] int not null,
 	[LastUpdated] datetime not null,
 	GembaTier varchar(50) null,
-	ERPUser varchar(10) null
+	ERPUser varchar(60) null,
+	AssignToQCN int not null
 )
 
 ALTER TABLE [bluebin].[MasterLog] WITH CHECK ADD FOREIGN KEY([BlueBinUserID])
@@ -1086,6 +1329,7 @@ BEGIN
 CREATE TABLE [qcn].[QCNStatus](
 	[QCNStatusID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
 	[Status] [varchar](255) NOT NULL,
+	[Description] varchar(100) null,
 	[Active] int not null,
 	[LastUpdated] datetime not null
 )
@@ -1093,14 +1337,14 @@ CREATE TABLE [qcn].[QCNStatus](
 ALTER TABLE [qcn].[QCN] WITH CHECK ADD FOREIGN KEY([QCNStatusID])
 REFERENCES [qcn].[QCNStatus] ([QCNStatusID])
 
-Insert into [qcn].[QCNStatus] VALUES 
-('New',1,getdate()),
-('InReview',1,getdate()),
-('InProgress',1,getdate()),
-('Rejected',1,getdate()),
-('OnHold',1,getdate()),
-('FutureVersion',1,getdate()),
-('Completed',1,getdate())
+insert into qcn.QCNStatus (Status,Active,LastUpdated,Description) VALUES
+('New/NotStarted','1',getdate(),'Logged, not yet evaluated for next steps.'),
+('InProgress/Approved','1',getdate(),'No additional support needed, QCN will be completed within 10 working days.'),
+('NeedsMoreInfo','1',getdate(),'Requester/clinical/other clarification.'),
+('AwaitingApproval','1',getdate(),'New items only, e.g. Value Analysis, Product Standards, or other new product committee process.'),
+('InFileMaintenance','1',getdate(),'New ERP # or other item activation steps.'),
+('Rejected','1',getdate(),'QCN is rejected.  This will remove the record off the Live board.'),
+('Completed','1',getdate(),'QCN is done.  This will remove the record off the Live board.')
 
 END
 GO
@@ -1113,6 +1357,7 @@ BEGIN
 CREATE TABLE [qcn].[QCNType](
 	[QCNTypeID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
 	[Name] [varchar](255) NOT NULL,
+	[Description] varchar(100) null,
 	[Active] int not null,
 	[LastUpdated] datetime not null
 )
@@ -1121,16 +1366,37 @@ ALTER TABLE [qcn].[QCN] WITH CHECK ADD FOREIGN KEY([QCNTypeID])
 REFERENCES [qcn].[QCNType] ([QCNTypeID])
 
 Insert into [qcn].[QCNType] VALUES 
-('ADD',1,getdate()),
-('CHANGE',1,getdate()),
-('UPDATE',1,getdate())
+('ADD','',1,getdate()),
+('MODIFY','',1,getdate()),
+('REMOVE','',1,getdate())
 
 END
 
+GO
 
 --*****************************************************
+--**************************NEWTABLE**********************
 
+if not exists (select * from sys.tables where name = 'QCNComplexity')
+BEGIN
+CREATE TABLE [qcn].[QCNComplexity](
+	[QCNCID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	[Name] [varchar](255) NOT NULL,
+	[Description] varchar(100) null,
+	[Active] int not null,
+	[LastUpdated] datetime not null
+)
+
+
+Insert into [qcn].[QCNComplexity] VALUES 
+('1','Many Nodes, Many Moves',1,getdate()),
+('2','Not Many Nodes, Many Moves',1,getdate()),
+('3','Many Nodes, Not Many Moves',1,getdate()),
+('4','Not Many Nodes, Not Many Moves',1,getdate())
+
+END
 GO
+
 SET ANSI_PADDING OFF
 GO
 
@@ -1141,12 +1407,19 @@ Print 'Table Adds Complete'
 --*****************************************************
 --**************************SPROC**********************
 
+
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanLinesReceive') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_SelectScanLinesReceive
 GO
 
 --exec sp_SelectScanLinesReceive 1
 
+/*
+select * from scan.ScanMatch
+select * from scan.ScanLine where ScanLineID = 25
+
+
+*/
 CREATE PROCEDURE sp_SelectScanLinesReceive
 @ScanBatchID int
 
@@ -1155,27 +1428,31 @@ AS
 BEGIN
 SET NOCOUNT ON
 select 
-sb.ScanBatchID,
+sbr.ScanBatchID,
 db.BinKey,
 db.BinSequence,
-rtrim(sb.LocationID) as LocationID,
+rtrim(sbr.LocationID) as LocationID,
 dl.LocationName as LocationName,
-sl.ItemID,
+slr.ItemID,
 di.ItemDescription,
-sl.Qty,
-sl.Line,
-sb.ScanDateTime as [DateScanned],
-case when sb.Extracted = 0 then 'No' Else 'Yes' end as Extracted
+slr.Qty,
+slo.Line,
+sbr.ScanDateTime as [DateScanned],
+bbu.LastName + ', ' + bbu.FirstName as ScannedBy
 
-from scan.ScanLine sl
-inner join scan.ScanBatch sb on sl.ScanBatchID = sb.ScanBatchID
-inner join bluebin.DimBin db on sb.LocationID = db.LocationID and sl.ItemID = db.ItemID
-inner join bluebin.DimItem di on sl.ItemID = di.ItemID
-inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
-where sl.ScanBatchID = @ScanBatchID and sl.Active = 1
-order by sl.Line
+from scan.ScanMatch sm
+inner join scan.ScanLine slr on sm.ScanLineReceiveID = slr.ScanLineID
+inner join scan.ScanLine slo on sm.ScanLineOrderID = slo.ScanLineID
+inner join scan.ScanBatch sbr on slr.ScanBatchID = sbr.ScanBatchID 
+inner join scan.ScanBatch sbo on slo.ScanBatchID = sbo.ScanBatchID 
+inner join bluebin.DimBin db on sbr.LocationID = db.LocationID and slr.ItemID = db.ItemID
+inner join bluebin.DimItem di on slr.ItemID = di.ItemID
+inner join bluebin.DimLocation dl on sbr.LocationID = dl.LocationID
+inner join bluebin.BlueBinUser bbu on sbr.BlueBinUserID = bbu.BlueBinUserID
+where slo.ScanBatchID = @ScanBatchID and slo.Active = 1
+order by slo.Line
 
-
+--11 --
 
 END
 GO
@@ -1183,17 +1460,26 @@ grant exec on sp_SelectScanLinesReceive to public
 GO
 
 
+
+
 --*****************************************************
 --**************************SPROC**********************
+
+
 
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertScanLineReceive') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_InsertScanLineReceive
 GO
 
 /* 
-exec sp_InsertScanLineReceive 1,'0001217','20',1
-exec sp_InsertScanLineReceive 1,'0001218','5',2
-exec sp_InsertScanLineReceive 1,'0002205','100',3
+exec sp_InsertScanBatch 'BB013','gbutler@bluebin.com','Receive'
+exec sp_InsertScanLineReceive 17,'0000014','1'
+exec sp_InsertScanLineReceive 17,'0000017','1'
+exec sp_InsertScanLineReceive 16,'0000018','1'
+
+select * from scan.ScanLine where Line = 0
+select * from scan.ScanMatch
+delete from scan.ScanLine where ScanBatchID in (select ScanBatchID from scan.ScanBatch where ScanType = 'Receive')
 */
 
 CREATE PROCEDURE sp_InsertScanLineReceive
@@ -1209,15 +1495,51 @@ SET NOCOUNT ON
 
 if exists (select * from bluebin.DimItem where ItemID = @Item) 
 BEGIN
-insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extracted)
-	select 
-	@ScanBatchID,
-	@Line,
-	@Item,
-	@Qty,
-	1,--Active Default to Yes
-	getdate(),
-	0 --Extracted default to No
+declare @ScanMatchLocationID varchar(7) 
+declare @ScanMatchFacilityID int 
+declare @ScanMatchItemID varchar(32) = @Item
+declare @ScanMatchScanLineOrderID int
+declare @ScanMatchScanLineReceiveID int
+declare @ScanMatch table (ScanBatchID int,ScanLineOrderID int,FaciltyID int,LocationID varchar(7),ItemID varchar(32),Qty int)
+
+select @ScanMatchFacilityID = FacilityID from scan.ScanBatch where ScanBatchID = @ScanBatchID
+select @ScanMatchLocationID = LocationID from scan.ScanBatch where ScanBatchID = @ScanBatchID
+select @ScanMatchScanLineOrderID = 
+min(ScanLineID)
+from scan.ScanBatch sb
+inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
+where
+sb.FacilityID = @ScanMatchFacilityID and
+sb.LocationID = @ScanMatchLocationID and
+sl.ItemID = @Item and 
+sb.ScanType like '%Order' and
+sl.ScanLineID not in (select ScanLineOrderID from scan.ScanMatch)
+
+		if @ScanMatchScanLineOrderID is not null 
+		BEGIN
+		insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extract)
+			select 
+			@ScanBatchID,
+			0,--Default Received Line to 0 for identification purposes
+			@Item,
+			@Qty,
+			1,--Active Default to Yes
+			getdate(),
+			0 --Extract default to No, will not extract this.
+
+		set @ScanMatchScanLineReceiveID = SCOPE_IDENTITY()
+
+		insert into scan.ScanMatch (ScanLineOrderID,ScanLineReceiveID,Qty,ScanDateTime) VALUES
+		(@ScanMatchScanLineOrderID,@ScanMatchScanLineReceiveID,@Qty,getdate())
+		END
+			ELSE
+			BEGIN
+			SELECT -2 -- Backout if there is no existing item waiting to be scanned in
+			delete from scan.ScanMatch where ScanLineReceiveID in (select ScanLineID from scan.ScanLine where ScanBatchID = @ScanBatchID)
+			delete from scan.ScanLine where ScanBatchID = @ScanBatchID
+			delete from scan.ScanBatch where ScanBatchID = @ScanBatchID
+			END
+
 END
 	ELSE
 	BEGIN
@@ -1230,6 +1552,8 @@ END
 GO
 grant exec on sp_InsertScanLineReceive to public
 GO
+
+
 
 
 
@@ -1308,59 +1632,6 @@ grant exec on sp_SelectScanDates to public
 GO
 
 
---*****************************************************
---**************************SPROC**********************
-if exists (select * from dbo.sysobjects where id = object_id(N'ssp_Versions') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure ssp_Versions
-GO
-
---exec ssp_Versions
-
-CREATE PROCEDURE ssp_Versions
---WITH ENCRYPTION
-AS
-BEGIN
-SET NOCOUNT ON
-DECLARE @DBTable TABLE (iid int identity (1,1) PRIMARY KEY,dbname varchar(50));
-DECLARE @DBUpdate TABLE (iid int identity (1,1) PRIMARY KEY,dbname varchar(50));
-Create table #Versions (dbname varchar(100),[Version] varchar(100))
-
-declare @iid int, @dbname varchar(50), @sql varchar(max), @sql2 varchar(max)
-
-
-insert @DBTable (dbname) select name from sys.databases 
-
-
-set @iid = 1
-While @iid <= (select MAX(iid) from @DBTable)
-BEGIN
-select @dbname = dbname from @DBTable where iid = @iid
-set @sql = 'Use ' + @DBName + 
-
-' 
-	if exists (select * from sys.tables where name = ''Config'')
-	BEGIN
-	insert into #versions (dbname,[Version])
-	select 
-		''' + @dbname + ''',
-		ConfigValue as Version
-	 from bluebin.Config where ConfigName = ''Version''
-	END
-'
-exec (@sql) 
-
-delete from #Versions where [Version] = ''
-set @iid = @iid +1
-END
-
-
-select * from #Versions order by 2 desc
-drop table #Versions
-
-END 
-GO
-grant exec on ssp_Versions to public
-GO
 
 
 
@@ -1391,7 +1662,7 @@ sb.ScanDateTime as ScanDateTime
 from 
 scan.ScanBatch sb
 inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
-where sb.Extracted = 0
+where sl.Extract = 1
 
 FOR XML PATH('ScanBatch'), ROOT('Scans')
 
@@ -2192,13 +2463,12 @@ GO
 
 
 
+
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertScanLine') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_InsertScanLine
 GO
 
 /* 
-select * from scan.ScanLine
-select * from scan.ScanBatch
 exec sp_InsertScanLine 1,'0001217','20',1
 exec sp_InsertScanLine 1,'0001218','5',2
 exec sp_InsertScanLine 1,'0002205','100',3
@@ -2217,7 +2487,11 @@ SET NOCOUNT ON
 
 if exists (select * from bluebin.DimItem where ItemID = @Item) 
 BEGIN
-insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extracted)
+
+declare @AutoExtractTrayScans int
+select @AutoExtractTrayScans = ConfigValue from bluebin.Config where ConfigName = 'AutoExtractTrayScans'
+
+insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extract)
 	select 
 	@ScanBatchID,
 	@Line,
@@ -2225,11 +2499,11 @@ insert into scan.ScanLine (ScanBatchID,Line,ItemID,Qty,Active,ScanDateTime,Extra
 	@Qty,
 	1,--Active Default to Yes
 	getdate(),
-	0 --Extracted default to No
+	@AutoExtractTrayScans --Extract, based on Config value from ConfigName = 'AutoExtractTrayScans'
 END
 	ELSE
 	BEGIN
-	SELECT -1 -- Must Change Password
+	SELECT -1 -- Back out scan if there is an issue with the Item existing
 	delete from scan.ScanLine where ScanBatchID = @ScanBatchID
 	delete from scan.ScanBatch where ScanBatchID = @ScanBatchID
 	END
@@ -2238,7 +2512,6 @@ END
 GO
 grant exec on sp_InsertScanLine to public
 GO
-
 
 --*****************************************************
 --**************************SPROC**********************
@@ -2272,6 +2545,7 @@ GO
 --*****************************************************
 --**************************SPROC**********************
 
+
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertScanBatch') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_InsertScanBatch
 GO
@@ -2279,33 +2553,43 @@ GO
 /*
 declare @Location char(5),@Scanner varchar(255) = 'gbutler@bluebin.com'
 select @Location = LocationID from bluebin.DimLocation where LocationName = 'DN NICU 1'
-exec sp_InsertScanBatch 'BB001','gbutler@bluebin.com'
+exec sp_InsertScanBatch 'BB013','gbutler@bluebin.com','Order'
+exec sp_InsertScanBatch 'BB013','gbutler@bluebin.com','Receive'
 */
 
 CREATE PROCEDURE sp_InsertScanBatch
 @Location char(10),
-@Scanner varchar(255)
+@Scanner varchar(255),
+@ScanType varchar(50)
 
 
 --WITH ENCRYPTION
 AS
 BEGIN
 SET NOCOUNT ON
-declare @FacilityID int
+declare @FacilityID int, @AutoExtractScans int
+select @AutoExtractScans = ConfigValue from bluebin.Config where ConfigName = 'AutoExtractScans'
 select @FacilityID = max(LocationFacility) from bluebin.DimLocation where rtrim(LocationID) = rtrim(@Location)--Only grab one FacilityID or else bad things will happen
 
-insert into scan.ScanBatch (FacilityID,LocationID,BlueBinUserID,Active,ScanDateTime,Extracted)
+insert into scan.ScanBatch (FacilityID,LocationID,BlueBinUserID,Active,ScanDateTime,Extract,ScanType)
 select 
 @FacilityID,
 @Location,
 (select BlueBinUserID from bluebin.BlueBinUser where LOWER(UserLogin) = LOWER(@Scanner)),
 1, --Default Active to Yes
 getdate(),
-0 --Default Extracted to No
+@AutoExtractScans, --Default Extract to value from ,
+@ScanType
 
 Declare @ScanBatchID int  = SCOPE_IDENTITY()
 
-exec sp_InsertMasterLog @Scanner,'Scan','New Scan Batch Entered',@ScanBatchID
+if @ScanType = 'ScanOrder'
+BEGIN
+exec sp_InsertMasterLog @Scanner,'Scan','New Scan Batch OrderEntered',@ScanBatchID
+END ELSE
+BEGIN
+exec sp_InsertMasterLog @Scanner,'Scan','New Scan Batch Receipt Entered',@ScanBatchID
+END
 
 Select @ScanBatchID
 
@@ -2315,10 +2599,10 @@ grant exec on sp_InsertScanBatch to public
 GO
 
 
+
+
 --*****************************************************
 --**************************SPROC**********************
-
-
 
 
 
@@ -2326,16 +2610,21 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanBatc
 drop procedure sp_SelectScanBatch
 GO
 
---exec sp_SelectScanBatch '',''
+--exec sp_SelectScanBatch '','',''
 
 CREATE PROCEDURE sp_SelectScanBatch
 @ScanDate varchar(20),
-@Facility varchar(50)
+@Facility varchar(50),
+@Location varchar(50)
 
 --WITH ENCRYPTION
 AS
 BEGIN
 SET NOCOUNT ON
+
+
+select @ScanDate = case when @ScanDate = 'Today' then convert(varchar,(convert(Date,getdate())),111) else @ScanDate end
+
 select 
 sb.ScanBatchID,
 rtrim(df.FacilityID) as FacilityID,
@@ -2346,17 +2635,28 @@ max(sl.Line) as BinsScanned,
 sb.ScanDateTime as [DateScanned],
 --convert(Date,sb.ScanDateTime) as ScanDate,
 bbu.LastName + ', ' + bbu.FirstName as ScannedBy,
-case when sb.Extracted = 0 then 'No' Else 'Yes' end as Extracted
+case when sb.ScanType like '%Tray%' then 'Tray' else 'Scan' end as Origin,
+case when max(sl.Line) - isnull(sm3.Ct,0) > 0 then  
+		case when sm3.Ct > 1 then 'Partial' else 'No' end
+	 else 'Yes' end as Extracted,
+case when max(sl.Line) - isnull(sm2.Ct,0) > 0 then 'No' else 'Yes' end as [Matched]
 
 from scan.ScanBatch sb
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
 inner join bluebin.DimFacility df on sb.FacilityID = df.FacilityID
 inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
-inner join bluebin.BlueBinUser bbu on sb.BlueBinUserID = bbu.BlueBinUserID
-where sb.Active = 1 
+left join bluebin.BlueBinUser bbu on sb.BlueBinUserID = bbu.BlueBinUserID
+left join
+	(select sl2.ScanBatchID,count(*) as Ct from scan.ScanMatch sm1 
+		inner join scan.ScanLine sl2 on sm1.ScanLineOrderID = sl2.ScanLineID group by sl2.ScanBatchID) sm2 on sb.ScanBatchID = sm2.ScanBatchID
+left join
+	(select sl3.ScanBatchID,count(*) as Ct from scan.ScanExtract se1 
+		inner join scan.ScanLine sl3 on se1.ScanLineID = sl3.ScanLineID group by sl3.ScanBatchID) sm3 on sb.ScanBatchID = sm3.ScanBatchID
+where sb.Active = 1 and ScanType like '%Order' 
 and convert(varchar,(convert(Date,sb.ScanDateTime)),111) LIKE '%' + @ScanDate + '%'  
 --and convert(varchar(4),df.FacilityID) +' - '+ df.FacilityName like '%' + @Facility + '%' 
 and sb.FacilityID like '%' + @Facility + '%' 
+and sb.LocationID like '%' + @Location + '%'
 
 group by 
 sb.ScanBatchID,
@@ -2366,7 +2666,9 @@ sb.LocationID,
 dl.LocationName,
 sb.ScanDateTime,
 bbu.LastName + ', ' + bbu.FirstName,
-sb.Extracted
+case when sb.ScanType like '%Tray%' then 'Tray' else 'Scan' end,
+sm2.Ct,
+sm3.Ct
 order by sb.ScanDateTime desc
 
 END
@@ -2376,16 +2678,18 @@ GO
 
 
 
+
+
+
 --*****************************************************
 --**************************SPROC**********************
-
 
 
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanLines') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_SelectScanLines
 GO
 
---exec sp_SelectScanLines 1
+--exec sp_SelectScanLines 38  select * from scan.ScanBatch
 
 CREATE PROCEDURE sp_SelectScanLines
 @ScanBatchID int
@@ -2402,28 +2706,30 @@ rtrim(sb.LocationID) as LocationID,
 dl.LocationName as LocationName,
 sl.ItemID,
 di.ItemDescription,
+sl.Bin,
 sl.Qty,
 sl.Line,
 sb.ScanDateTime as [DateScanned],
-case when sb.Extracted = 0 then 'No' Else 'Yes' end as Extracted
+bbu.LastName + ', ' + bbu.FirstName as ScannedBy,
+case when sb.ScanType like '%Tray%' then 'Tray' else 'Scan' end as Origin,
+sl.Extract,
+case when se.ScanLineID is not null then 'Yes' else 'No' end as Extracted
 
 from scan.ScanLine sl
 inner join scan.ScanBatch sb on sl.ScanBatchID = sb.ScanBatchID
 inner join bluebin.DimBin db on sb.LocationID = db.LocationID and sl.ItemID = db.ItemID
 inner join bluebin.DimItem di on sl.ItemID = di.ItemID
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
-where sl.ScanBatchID = @ScanBatchID and sl.Active = 1
+left join bluebin.BlueBinUser bbu on sb.BlueBinUserID = bbu.BlueBinUserID
+left join (select distinct ScanLineID from scan.ScanExtract) se on sl.ScanLineID = se.ScanLineID
+where sl.ScanBatchID = @ScanBatchID and sl.Active = 1 and sb.ScanType like '%Order'
 order by sl.Line
-
 
 
 END
 GO
 grant exec on sp_SelectScanLines to public
 GO
-
-
-
 
 --*****************************************************
 --**************************SPROC**********************
@@ -2505,10 +2811,12 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCN') an
 drop procedure sp_SelectQCN
 GO
 
-
---exec sp_SelectQCN '%','0','%'
+--select * from qcn.QCN
+--exec sp_SelectQCN '%','%','%','0','%'
 CREATE PROCEDURE sp_SelectQCN
-@LocationName varchar(50)
+@FacilityName varchar(50)
+,@LocationName varchar(50)
+,@QCNStatusName varchar(255)
 ,@Completed int
 ,@AssignedUserName varchar(50)
 
@@ -2526,23 +2834,24 @@ end
 
 select 
 	q.[QCNID],
+	q.FacilityID,
+	df.FacilityName,
 	q.[LocationID],
     case
-		when dl.LocationID = dl.LocationName then dl.LocationID
-		else dl.LocationID + ' - ' + dl.[LocationName] end as LocationName,
-	u.LastName + ', ' + u.FirstName  as RequesterUserName,
-        u.[Login] as RequesterLogin,
-    u.[Title] as RequesterTitleName,
-    case when v.Login is null then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
-        ISNULL(v.[Login],'') as AssignedLogin,
+		when q.[LocationID] = 'Multiple' then q.LocationID
+		else case	when dl.LocationID = dl.LocationName then dl.LocationID
+					else dl.LocationID + ' - ' + dl.[LocationName] end end as LocationName,
+	RequesterUserID  as RequesterUserName,
+	ApprovedBy as ApprovedBy,
+    case when v.UserLogin is null then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
+        ISNULL(v.[UserLogin],'') as AssignedLogin,
     ISNULL(v.[Title],'') as AssignedTitleName,
 	qt.Name as QCNType,
 q.[ItemID],
 COALESCE(di.ItemClinicalDescription,di.ItemDescription,'No Description') as ItemClinicalDescription,
-db.[BinQty] as Par,
-db.[BinUOM] as UOM,
-di.[ItemManufacturer],
-di.[ItemManufacturerNumber],
+q.Par,
+q.UOM,
+q.ManuNumName,
 	q.[Details] as [DetailsText],
             case when q.[Details] ='' then 'No' else 'Yes' end Details,
 	q.[Updates] as [UpdatesText],
@@ -2552,20 +2861,23 @@ di.[ItemManufacturerNumber],
             q.[DateEntered],
 	q.[DateCompleted],
 	qs.Status,
-    case when db.BinCurrentStatus is null then 'N/A' else db.BinCurrentStatus end as BinStatus,
     q.[LastUpdated],
-	q.InternalReference
+	q.InternalReference,
+	qc.Name as Complexity
 from [qcn].[QCN] q
-left join [bluebin].[DimBin] db on q.LocationID = db.LocationID and rtrim(q.ItemID) = rtrim(db.ItemID)
+--left join [bluebin].[DimBin] db on q.LocationID = db.LocationID and rtrim(q.ItemID) = rtrim(db.ItemID)
 left join [bluebin].[DimItem] di on rtrim(q.ItemID) = rtrim(di.ItemID)
-        inner join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
-inner join [bluebin].[BlueBinResource] u on q.RequesterUserID = u.BlueBinResourceID
-left join [bluebin].[BlueBinResource] v on q.AssignedUserID = v.BlueBinResourceID
+        left join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
+		left join [bluebin].[DimFacility] df on q.FacilityID = df.FacilityID
+left join [bluebin].[BlueBinUser] v on q.AssignedUserID = v.BlueBinUserID
 inner join [qcn].[QCNType] qt on q.QCNTypeID = qt.QCNTypeID
 inner join [qcn].[QCNStatus] qs on q.QCNStatusID = qs.QCNStatusID
+left join qcn.QCNComplexity qc on q.QCNCID = qc.QCNCID
 
 WHERE q.Active = 1 
-and dl.LocationID + ' - ' + dl.[LocationName] LIKE '%' + @LocationName + '%' 
+and df.FacilityName like '%' + @FacilityName + '%'
+and (dl.LocationID + ' - ' + dl.[LocationName] LIKE '%' + @LocationName + '%' or q.LocationID like '%' + @LocationName + '%')
+and qs.Status LIKE '%' + @QCNStatusName + '%'
 and q.QCNStatusID not in (@QCNStatus,@QCNStatus2)
 and case	
 		when @AssignedUserName <> '%' then v.LastName + ', ' + v.FirstName else '' end LIKE  '%' + @AssignedUserName + '%' 
@@ -2575,6 +2887,10 @@ END
 GO
 grant exec on sp_SelectQCN to appusers
 GO
+
+
+
+
 
 --*****************************************************
 --**************************SPROC**********************
@@ -2875,15 +3191,22 @@ GO
 
 CREATE PROCEDURE sp_EditQCN
 @QCNID int,
+@FacilityID int,
 @LocationID varchar(10),
 @ItemID varchar(32),
+@ClinicalDescription varchar(30),
 @Requester varchar(255),
-@Assigned varchar(255),
+@ApprovedBy varchar(255),
+@Assigned int,
+@QCNComplexity varchar(255),
 @QCNType varchar(255),
 @Details varchar(max),
 @Updates varchar(max),
 @QCNStatus varchar(255),
-@InternalReference varchar(50)
+@InternalReference varchar(50),
+@ManuNumName varchar(60),
+@Par int,
+@UOM varchar(10)
 
 
 --WITH ENCRYPTION
@@ -2892,10 +3215,14 @@ BEGIN
 SET NOCOUNT ON
 	
 update [qcn].[QCN] set
+FacilityID = @FacilityID,
 [LocationID] = @LocationID,
 [ItemID] = @ItemID,
-[RequesterUserID] = (select [BlueBinResourceID] from [bluebin].[BlueBinResource] where LastName + ', ' + FirstName + ' (' + Login + ')' = @Requester),
-[AssignedUserID] = (select [BlueBinResourceID] from [bluebin].[BlueBinResource] where LastName + ', ' + FirstName + ' (' + Login + ')' = @Assigned),
+ClinicalDescription = @ClinicalDescription,
+[RequesterUserID] = @Requester,
+ApprovedBy = @ApprovedBy,
+[AssignedUserID] = @Assigned,
+[QCNCID] =  @QCNComplexity,
 [QCNTypeID] = (select [QCNTypeID] from [qcn].[QCNType] where [Name] = @QCNType),
 [Details] = @Details,
 [Updates] = @Updates,
@@ -2904,7 +3231,10 @@ update [qcn].[QCN] set
                             else NULL end,
 [QCNStatusID] = (select [QCNStatusID] from [qcn].[QCNStatus] where [Status] = @QCNStatus),
 [LastUpdated] = getdate(),
-InternalReference = @InternalReference
+InternalReference = @InternalReference,
+ManuNumName = @ManuNumName,
+Par = @Par,
+UOM = @UOM
 WHERE QCNID = @QCNID
 
 
@@ -2928,19 +3258,21 @@ CREATE PROCEDURE sp_EditQCNStatus
 @QCNStatusID int
 ,@Status varchar (255)
 ,@Active int
+,@Description varchar(100)
 
 
 --WITH ENCRYPTION
 AS
 BEGIN
 SET NOCOUNT ON
-	Update qcn.QCNStatus set [Status] = @Status,[Active] = @Active, [LastUpdated ]= getdate() where QCNStatusID = @QCNStatusID
+	Update qcn.QCNStatus set [Status] = @Status,[Active] = @Active, [LastUpdated ]= getdate(),Description = @Description where QCNStatusID = @QCNStatusID
 
 END
 
 GO
 grant exec on sp_EditQCNStatus to appusers
 GO
+
 
 --*****************************************************
 --**************************SPROC**********************
@@ -2954,22 +3286,20 @@ CREATE PROCEDURE sp_EditQCNType
 @QCNTypeID int
 ,@Name varchar (255)
 ,@Active int
+,@Description varchar(100)
 
 
 --WITH ENCRYPTION
 AS
 BEGIN
 SET NOCOUNT ON
-	Update qcn.QCNType set Name = @Name,Active = @Active, LastUpdated = getdate() where QCNTypeID = @QCNTypeID
+	Update qcn.QCNType set Name = @Name,Active = @Active, LastUpdated = getdate(),Description = @Description where QCNTypeID = @QCNTypeID
 
 END
 
 GO
 grant exec on sp_EditQCNType to appusers
 GO
-
-
-
 
 --*****************************************************
 --**************************SPROC**********************
@@ -3102,7 +3432,8 @@ GO
 --exec sp_InsertQCNStatus 'TEST'
 
 CREATE PROCEDURE sp_InsertQCNStatus
-@Status varchar (255)
+@Status varchar (255),
+@Description varchar(100)
 
 
 --WITH ENCRYPTION
@@ -3113,7 +3444,7 @@ if exists(select * from qcn.QCNStatus where Status = @Status)
 BEGIN
 GOTO THEEND
 END
-insert into qcn.QCNStatus (Status,Active,LastUpdated) VALUES (@Status,1,getdate())
+insert into qcn.QCNStatus (Status,Active,LastUpdated,Description) VALUES (@Status,1,getdate(),@Description)
 
 END
 THEEND:
@@ -3132,7 +3463,8 @@ GO
 --exec sp_InsertQCNType 'TEST'
 
 CREATE PROCEDURE sp_InsertQCNType
-@Name varchar (255)
+@Name varchar (255),
+@Description varchar(100)
 
 
 
@@ -3144,7 +3476,7 @@ if exists(select * from qcn.QCNType where Name = @Name)
 BEGIN
 GOTO THEEND
 END
-insert into qcn.QCNType (Name,Active,LastUpdated) VALUES (@Name,1,getdate())
+insert into qcn.QCNType (Name,Active,LastUpdated,Description) VALUES (@Name,1,getdate(),@Description)
 
 END
 THEEND:
@@ -3517,10 +3849,10 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCNFormE
 drop procedure sp_SelectQCNFormEdit
 GO
 
---exec sp_SelectQCNFormEdit '73'  
+--exec sp_SelectQCNFormEdit '270'
+
 CREATE PROCEDURE sp_SelectQCNFormEdit
 @QCNID int
-
 
 --WITH ENCRYPTION
 AS
@@ -3529,22 +3861,32 @@ SET NOCOUNT ON
 SELECT 
 	[QCNID]
 	,rtrim([LocationID]) as LocationID
+	,a.FacilityID
 	,rtrim(a.ItemID) as ItemID
-	,b1.LastName + ', ' + b1.FirstName + ' (' + b1.Login + ')' as [RequesterUser]
-	,b2.LastName + ', ' + b2.FirstName + ' (' + b2.Login + ')' as [AssignedUser]
+	,a.ClinicalDescription
+	,RequesterUserID as RequesterUser
+	,ApprovedBy
+	,a.[AssignedUserID] as AssignedUser
+	,a.QCNCID as QCNComplexity
 	,qt.Name as QCNType
 	,[Details]
 	,[Updates]
+	,convert(varchar,a.[DateRequested],101) as [DateRequested]
 	,convert(varchar,a.[DateEntered],101) as [DateEntered]
 	,convert(varchar,a.[DateCompleted],101) as [DateCompleted]
 	,qs.Status as QCNStatus
 	,convert(varchar,a.[LastUpdated],101) as [LastUpdated]
 	,InternalReference
+	,ManuNumName
+	,bbu.LastName + ', ' + bbu.FirstName + ' (' + bbu.UserLogin + ')' as [LoggedByUser]
+	,Par
+	,UOM
 		FROM [qcn].[QCN] a 
-			inner join bluebin.BlueBinResource b1 on a.[RequesterUserID] = b1.BlueBinResourceID
-			left join bluebin.BlueBinResource b2 on a.[AssignedUserID] = b2.BlueBinResourceID
+		inner join bluebin.BlueBinUser bbu on a.LoggedUserID = bbu.BlueBinUserID
+			left join bluebin.BlueBinUser b2 on a.[AssignedUserID] = b2.BlueBinUserID
 			left join qcn.QCNStatus qs on a.[QCNStatusID] = qs.[QCNStatusID]
 			left join qcn.QCNType qt on a.[QCNTypeID] = qt.[QCNTypeID]
+			left join qcn.QCNComplexity qc on a.[QCNCID] = qc.[QCNCID]
 		where a.QCNID=@QCNID
 
 END
@@ -3553,6 +3895,125 @@ grant exec on sp_SelectQCNFormEdit to appusers
 GO
 
 
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCNComplexity') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectQCNComplexity
+GO
+
+--exec sp_SelectQCNComplexity 
+
+CREATE PROCEDURE sp_SelectQCNComplexity
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+	SELECT 
+	QCNCID,
+	Name,
+	Description,
+	case 
+		when Active = 1 then 'Yes' 
+		Else 'No' 
+		end as ActiveName,
+	Active,
+	LastUpdated 
+	
+	FROM qcn.[QCNComplexity]
+
+END
+GO
+grant exec on sp_SelectQCNComplexity to appusers
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertQCNComplexity') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_InsertQCNComplexity
+GO
+
+--exec sp_InsertQCNComplexity 'TEST'
+
+CREATE PROCEDURE sp_InsertQCNComplexity
+@Name varchar (255),
+@Description varchar(100)
+
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+if exists(select * from qcn.QCNComplexity where Name = @Name)
+BEGIN
+GOTO THEEND
+END
+insert into qcn.QCNComplexity (Name,Active,LastUpdated,Description) VALUES (@Name,1,getdate(),@Description)
+
+END
+THEEND:
+
+GO
+grant exec on sp_InsertQCNComplexity to appusers
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_DeleteQCNComplexity') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_DeleteQCNComplexity
+GO
+
+--exec sp_DeleteQCNComplexity
+
+CREATE PROCEDURE sp_DeleteQCNComplexity
+@original_QCNCID int,
+@original_Name varchar(255)
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+	
+	Update qcn.[QCNComplexity] set Active = 0
+	WHERE 
+	[QCNCID] = @original_QCNCID 
+		AND [Name] = @original_Name
+END
+GO
+grant exec on sp_DeleteQCNComplexity to appusers
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_EditQCNComplexity') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_EditQCNComplexity
+GO
+
+--exec sp_EditQCNComplexity 'TEST'
+
+CREATE PROCEDURE sp_EditQCNComplexity
+@QCNCID int
+,@Name varchar (255)
+,@Active int
+,@Description varchar(100)
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+	Update qcn.QCNComplexity set Name = @Name,Active = @Active, LastUpdated = getdate(),Description = @Description where QCNCID = @QCNCID
+
+END
+
+GO
+grant exec on sp_EditQCNComplexity to appusers
+GO
 
 --*****************************************************
 --**************************SPROC**********************
@@ -3571,6 +4032,7 @@ SET NOCOUNT ON
 	SELECT 
 	QCNStatusID,
 	[Status],
+	Description,
 	case 
 		when Active = 1 then 'Yes' 
 		Else 'No' 
@@ -3603,6 +4065,7 @@ SET NOCOUNT ON
 	SELECT 
 	QCNTypeID,
 	Name,
+	Description,
 	case 
 		when Active = 1 then 'Yes' 
 		Else 'No' 
@@ -3693,7 +4156,8 @@ CREATE PROCEDURE sp_InsertUser
 @Email varchar(60),
 @Title varchar(50),
 @GembaTier varchar(50),
-@ERPUser varchar(10)
+@ERPUser varchar(60),
+@AssignToQCN int
 	
 --WITH ENCRYPTION
 AS
@@ -3711,9 +4175,9 @@ set @newpwdHash = convert(varbinary(max),rtrim(@RandomPassword))
 
 if not exists (select BlueBinUserID from bluebin.BlueBinUser where LOWER(UserLogin) = LOWER(@UserLogin))
 	BEGIN
-	insert into bluebin.BlueBinUser (UserLogin,FirstName,LastName,MiddleName,RoleID,MustChangePassword,PasswordExpires,[Password],Email,Active,LastUpdated,LastLoginDate,Title,GembaTier,ERPUser)
+	insert into bluebin.BlueBinUser (UserLogin,FirstName,LastName,MiddleName,RoleID,MustChangePassword,PasswordExpires,[Password],Email,Active,LastUpdated,LastLoginDate,Title,GembaTier,ERPUser,AssignToQCN)
 	VALUES
-	(LOWER(@UserLogin),@FirstName,@LastName,@MiddleName,@RoleID,1,@DefaultExpiration,(HASHBYTES('SHA1', @newpwdHash)),LOWER(@UserLogin),1,getdate(),getdate(),@Title,@GembaTier,@ERPUser)
+	(LOWER(@UserLogin),@FirstName,@LastName,@MiddleName,@RoleID,1,@DefaultExpiration,(HASHBYTES('SHA1', @newpwdHash)),LOWER(@UserLogin),1,getdate(),getdate(),@Title,@GembaTier,@ERPUser,@AssignToQCN)
 	;
 	SET @NewBlueBinUserID = SCOPE_IDENTITY()
 	set @message = 'New User Created - '+ LOWER(@UserLogin)
@@ -3760,7 +4224,8 @@ CREATE PROCEDURE sp_EditUser
 @RoleName  varchar(30),
 @Title varchar(50),
 @GembaTier varchar(50),
-@ERPUser varchar(10)
+@ERPUser varchar(60),
+@AssignToQCN int
 
 
 --WITH ENCRYPTION
@@ -3784,7 +4249,8 @@ IF (@Password = '' or @Password is null)
         RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName),
 		Title = @Title,
 		GembaTier = @GembaTier,
-		ERPUser = @ERPUser
+		ERPUser = @ERPUser,
+		AssignToQCN = @AssignToQCN
 		Where BlueBinUserID = @BlueBinUserID
 	END
 	ELSE
@@ -3802,7 +4268,8 @@ IF (@Password = '' or @Password is null)
         RoleID = (select RoleID from bluebin.BlueBinRoles where RoleName = @RoleName),
 		Title = @Title,
 		GembaTier = @GembaTier,
-		ERPUser = @ERPUser
+		ERPUser = @ERPUser,
+		AssignToQCN = @AssignToQCN
 		Where BlueBinUserID = @BlueBinUserID
 	END
 
@@ -3814,6 +4281,7 @@ END
 GO
 grant exec on sp_EditUser to appusers
 GO
+
 --*****************************************************
 --**************************SPROC**********************
 
@@ -3857,6 +4325,11 @@ SET NOCOUNT ON
       ,[Email]
 	  ,GembaTier
 	  ,ERPUser
+	  ,case 
+		when [AssignToQCN] = 1 then 'Yes' 
+		Else 'No' 
+		end as AssignToQCNName
+		,AssignToQCN
   FROM [bluebin].[BlueBinUser] bbu
   inner join bluebin.BlueBinRoles bbur on bbu.RoleID = bbur.RoleID
   where UserLogin <> ''
@@ -3869,7 +4342,6 @@ END
 GO
 grant exec on sp_SelectUsers to appusers
 GO
-
 
 
 --*****************************************************
@@ -4540,16 +5012,24 @@ GO
 --exec sp_InsertQCN 
 
 CREATE PROCEDURE sp_InsertQCN
+@DateRequested datetime,
+@FacilityID int,
 @LocationID varchar(10),
 @ItemID varchar(32),
+@ClinicalDescription varchar(30),
 @Requester varchar(255),
-@Assigned varchar(255),
+@ApprovedBy varchar(255),
+@Assigned int,
+@QCNComplexity varchar(255),
 @QCNType varchar(255),
 @Details varchar(max),
 @Updates varchar(max),
 @QCNStatus varchar(255),
 @UserLogin varchar (60),
-@InternalReference varchar(50)
+@InternalReference varchar(50),
+@ManuNumName varchar(60),
+@Par int,
+@UOM varchar(10)
 
 
 --WITH ENCRYPTION
@@ -4557,37 +5037,56 @@ AS
 BEGIN
 SET NOCOUNT ON
 set @UserLogin = LOWER(@UserLogin)
-Declare @QCNID int
+Declare @QCNID int, @LoggedUserID int
+set @LoggedUserID = (select BlueBinUserID from bluebin.BlueBinUser where LOWER(UserLogin) = LOWER(@UserLogin))
 
 insert into [qcn].[QCN] 
-([LocationID],
+(FacilityID,
+[LocationID],
 	[ItemID],
+		[ClinicalDescription],
 		[RequesterUserID],
+		[ApprovedBy],
 			[AssignedUserID],
+				[QCNCID],
 				[QCNTypeID],
 					[Details],
 						[Updates],
+							[DateRequested],
 							[DateEntered],
 								[DateCompleted],
 									[QCNStatusID],
 										[Active],
 											[LastUpdated],
-												[InternalReference])
+												[InternalReference],
+												ManuNumName,
+													[LoggedUserID],
+													Par,
+													UOM)
 
 select 
+@FacilityID,
 @LocationID,
 case when @ItemID = '' then NULL else @ItemID end,
-(select [BlueBinResourceID] from [bluebin].[BlueBinResource] where LastName + ', ' + FirstName + ' (' + Login + ')' = @Requester),
-case when @Assigned = '' then NULL else (select [BlueBinResourceID] from [bluebin].[BlueBinResource] where LastName + ', ' + FirstName + ' (' + Login + ')' = @Assigned) end,
+@ClinicalDescription,
+@Requester,
+@ApprovedBy,
+case when @Assigned = '' then NULL else @Assigned end,
+@QCNComplexity,
 (select [QCNTypeID] from [qcn].[QCNType] where [Name] = @QCNType),
 @Details,
 @Updates,
+@DateRequested,
 getdate(),
 Case when @QCNStatus in('Rejected','Completed') then getdate() else NULL end,
 (select [QCNStatusID] from [qcn].[QCNStatus] where [Status] = @QCNStatus),
 1, --Active
 getdate(), --LastUpdated
-@InternalReference
+@InternalReference,
+@ManuNumName,
+@LoggedUserID,
+@Par,
+@UOM
 
 
 SET @QCNID = SCOPE_IDENTITY()
@@ -4598,7 +5097,6 @@ END
 GO
 grant exec on sp_InsertQCN to appusers
 GO
-
 --*****************************************************
 --**************************SPROC**********************
 
@@ -4647,13 +5145,12 @@ GO
 --*****************************************************
 --**************************SPROC**********************
 
-
-if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCNLocation') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure sp_SelectQCNLocation
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectConesLocation') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectConesLocation
 GO
 
 --exec sp_SelectQCNLocation
-CREATE PROCEDURE sp_SelectQCNLocation
+CREATE PROCEDURE sp_SelectConesLocation
 
 --WITH ENCRYPTION
 AS
@@ -4671,6 +5168,69 @@ from [bluebin].[DimBin] a
 								inner join bluebin.DimItem di on q.ItemID = di.ItemID
 								inner join bluebin.DimLocation dl on q.LocationID = dl.LocationID
                                        order by 4 asc
+
+END
+GO
+grant exec on sp_SelectConesLocation to appusers
+GO
+
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCNFacility') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectQCNFacility
+GO
+
+--exec sp_SelectQCNFacility
+CREATE PROCEDURE sp_SelectQCNFacility
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+select 
+	distinct 
+	q.[FacilityID],
+    df.FacilityName as FacilityName
+	from qcn.QCN q
+	left join [bluebin].[DimFacility] df on q.FacilityID = df.FacilityID 
+
+END
+GO
+grant exec on sp_SelectQCNFacility to appusers
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCNLocation') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectQCNLocation
+GO
+
+--exec sp_SelectQCNLocation
+CREATE PROCEDURE sp_SelectQCNLocation
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+select 
+	distinct 
+	q.[LocationID],
+    case
+		when q.[LocationID] = 'Multiple' then q.LocationID
+		else case	when dl.LocationID = dl.LocationName then dl.LocationID
+					else dl.LocationID + ' - ' + dl.[LocationName] end end as LocationName
+	from qcn.QCN q
+	left join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
 
 END
 GO
@@ -5743,7 +6303,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectConesDep
 drop procedure sp_SelectConesDeployed
 GO
 
---exec sp_SelectConesDeployed '006',''
+--exec sp_SelectConesDeployed '',''
 
 CREATE PROCEDURE sp_SelectConesDeployed
 @Location varchar(7),
@@ -5756,14 +6316,18 @@ SET NOCOUNT ON
 	SELECT 
 	cd.ConesDeployedID,
 	cd.Deployed,
+	cd.ExpectedDelivery,
 	df.FacilityID,
 	df.FacilityName,
 	dl.LocationID,
 	dl.LocationName,
 	di.ItemID,
 	di.ItemDescription,
+	cd.SubProduct,
 	db.BinSequence,
-	case when so.ItemID is not null then 'Yes' else 'No' end as DashboardStockout
+	case when so.ItemID is not null then 'Yes' else 'No' end as DashboardStockout,
+	cd.Details as DetailsText,
+	case when Details is null or Details = '' then 'No' else 'Yes' end as Details
 	
 	FROM bluebin.[ConesDeployed] cd
 	inner join bluebin.DimFacility df on cd.FacilityID = df.FacilityID
@@ -5784,6 +6348,7 @@ GO
 grant exec on sp_SelectConesDeployed to appusers
 GO
 
+
 --*****************************************************
 --**************************SPROC**********************
 
@@ -5791,12 +6356,16 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_InsertConesDep
 drop procedure sp_InsertConesDeployed
 GO
 
---exec sp_InsertConesDeployed
+--exec sp_InsertConesDeployed '6','BB006','0044100'
+
 
 CREATE PROCEDURE sp_InsertConesDeployed
 @FacilityID int
 ,@LocationID varchar (7)
 ,@ItemID varchar (32)
+,@ExpectedDelivery datetime
+,@SubProduct varchar(3)
+,@Details varchar(255)
 
 
 --WITH ENCRYPTION
@@ -5805,8 +6374,8 @@ BEGIN
 SET NOCOUNT ON
 
 
-insert into bluebin.ConesDeployed (FacilityID,LocationID,ItemID,ConeDeployed,Deployed,ConeReturned,Deleted,LastUpdated) VALUES
-(@FacilityID,@LocationID,@ItemID,1,getdate(),0,0,getdate()) 
+insert into bluebin.ConesDeployed (FacilityID,LocationID,ItemID,ConeDeployed,Deployed,ConeReturned,Deleted,LastUpdated,ExpectedDelivery,SubProduct,Details) VALUES
+(@FacilityID,@LocationID,@ItemID,1,getdate(),0,0,getdate(),@ExpectedDelivery,@SubProduct,@Details) 
 
 END
 
@@ -5909,11 +6478,261 @@ GO
 grant exec on sp_SelectConfigType to appusers
 GO
 
+--*****************************************************
+--**************************SPROC**********************
 
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanLocations') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectScanLocations
+GO
+
+--exec sp_SelectScanLocations 
+CREATE PROCEDURE sp_SelectScanLocations
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+SELECT DISTINCT 
+convert(varchar(7),dl.LocationID) +' - '+ dl.LocationName as LocationLongName,
+sb.LocationID
+from scan.ScanBatch sb
+inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
+WHERE Active = 1 --and convert(Date,ScanDateTime) = @ScanDate 
+order by sb.LocationID asc
+
+END 
+GO
+grant exec on sp_SelectScanLocations to public
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
+
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectScanLinesOpen') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectScanLinesOpen
+GO
+
+--exec sp_SelectScanLinesOpen '','',''
+
+CREATE PROCEDURE sp_SelectScanLinesOpen
+@ScanDate varchar(20),
+@Facility varchar(50),
+@Location varchar(50)
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+select 
+sb.ScanBatchID,
+db.BinKey,
+db.BinSequence,
+rtrim(sb.LocationID) as LocationID,
+dl.LocationName as LocationName,
+sl.ItemID,
+di.ItemDescription,
+sl.Qty,
+sl.Line,
+sb.ScanDateTime as [DateScanned],
+case when se.ScanLineID is not null then 'Yes' else 'No' end as Extracted,
+convert(int,(getdate() - sb.ScanDateTime)) as DaysOpen
+
+from scan.ScanLine sl
+inner join scan.ScanBatch sb on sl.ScanBatchID = sb.ScanBatchID
+inner join bluebin.DimBin db on sb.LocationID = db.LocationID and sl.ItemID = db.ItemID
+inner join bluebin.DimItem di on sl.ItemID = di.ItemID
+inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
+inner join bluebin.DimFacility df on sb.FacilityID = df.FacilityID
+left join (select distinct ScanLineID from scan.ScanExtract) se on sl.ScanLineID = se.ScanLineID
+where sl.Active = 1 and sb.ScanType like '%Order' 
+
+and sl.ScanLineID not in (select ScanLineOrderID from scan.ScanMatch)
+and convert(varchar,(convert(Date,sb.ScanDateTime)),111) LIKE '%' + @ScanDate + '%'  
+and sb.FacilityID like '%' + @Facility + '%' 
+and sb.LocationID like '%' + @Location + '%'
+order by DateScanned,LocationID,Line
+
+END
+GO
+grant exec on sp_SelectScanLinesOpen to public
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+--*****************************************************
+--**************************SPROC**********************
+
+--*****************************************************
+--**************************SPROC**********************
+
+--*****************************************************
+--**************************SPROC**********************
+
+--*****************************************************
+--**************************SPROC**********************
 
 
 Print 'Main Sproc Add/Updates Complete'
 
+--*****************************************************
+--**************************SPROC**********************
+
+
+
+if exists (select * from dbo.sysobjects where id = object_id(N'ssp_TableSize') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure ssp_TableSize
+GO
+
+--exec ssp_TableSize 'dbo'
+
+CREATE PROCEDURE ssp_TableSize
+@schema varchar(20)
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+/*
+select 
+'Insert into @Count select '''+ss.name+''','''+st.name+''', count(*) from ' + ss.name + '.' + st.name
+from sys.tables st
+inner join sys.schemas ss on st.schema_id = ss.schema_id
+where ss.name in ('tableau','dbo','bluebin')
+order by st.name
+*/
+declare @Count Table ([Schema] varchar(50),TableName varchar(100),[Count] int)
+--insert results of query here
+Insert into @Count select 'dbo','APCOMPANY', count(*) from dbo.APCOMPANY
+Insert into @Count select 'dbo','APVENMAST', count(*) from dbo.APVENMAST
+Insert into @Count select 'bluebin','BlueBinFacility', count(*) from bluebin.BlueBinFacility
+Insert into @Count select 'bluebin','BlueBinOperations', count(*) from bluebin.BlueBinOperations
+Insert into @Count select 'bluebin','BlueBinParMaster', count(*) from bluebin.BlueBinParMaster
+Insert into @Count select 'bluebin','BlueBinResource', count(*) from bluebin.BlueBinResource
+Insert into @Count select 'bluebin','BlueBinRoleOperations', count(*) from bluebin.BlueBinRoleOperations
+Insert into @Count select 'bluebin','BlueBinRoles', count(*) from bluebin.BlueBinRoles
+Insert into @Count select 'bluebin','BlueBinUser', count(*) from bluebin.BlueBinUser
+Insert into @Count select 'bluebin','BlueBinUserOperations', count(*) from bluebin.BlueBinUserOperations
+Insert into @Count select 'dbo','BUYER', count(*) from dbo.BUYER
+Insert into @Count select 'bluebin','ConesDeployed', count(*) from bluebin.ConesDeployed
+Insert into @Count select 'bluebin','Config', count(*) from bluebin.Config
+Insert into @Count select 'tableau','Contracts', count(*) from tableau.Contracts
+Insert into @Count select 'bluebin','DimBin', count(*) from bluebin.DimBin
+Insert into @Count select 'bluebin','DimBinHistory', count(*) from bluebin.DimBinHistory
+Insert into @Count select 'bluebin','DimBinStatus', count(*) from bluebin.DimBinStatus
+Insert into @Count select 'bluebin','DimDate', count(*) from bluebin.DimDate
+Insert into @Count select 'bluebin','DimFacility', count(*) from bluebin.DimFacility
+Insert into @Count select 'bluebin','DimItem', count(*) from bluebin.DimItem
+Insert into @Count select 'bluebin','DimLocation', count(*) from bluebin.DimLocation
+Insert into @Count select 'bluebin','DimSnapshotDate', count(*) from bluebin.DimSnapshotDate
+Insert into @Count select 'bluebin','DimWarehouseItem', count(*) from bluebin.DimWarehouseItem
+Insert into @Count select 'bluebin','Document', count(*) from bluebin.Document
+Insert into @Count select 'bluebin','FactBinSnapshot', count(*) from bluebin.FactBinSnapshot
+Insert into @Count select 'bluebin','FactIssue', count(*) from bluebin.FactIssue
+Insert into @Count select 'bluebin','FactScan', count(*) from bluebin.FactScan
+Insert into @Count select 'bluebin','FactWarehouseSnapshot', count(*) from bluebin.FactWarehouseSnapshot
+Insert into @Count select 'dbo','GLCHARTDTL', count(*) from dbo.GLCHARTDTL
+Insert into @Count select 'dbo','GLNAMES', count(*) from dbo.GLNAMES
+Insert into @Count select 'dbo','GLTRANS', count(*) from dbo.GLTRANS
+Insert into @Count select 'dbo','ICCATEGORY', count(*) from dbo.ICCATEGORY
+Insert into @Count select 'dbo','ICLOCATION', count(*) from dbo.ICLOCATION
+Insert into @Count select 'dbo','ICMANFCODE', count(*) from dbo.ICMANFCODE
+Insert into @Count select 'dbo','ICTRANS', count(*) from dbo.ICTRANS
+Insert into @Count select 'bluebin','Image', count(*) from bluebin.Image
+Insert into @Count select 'dbo','ITEMLOC', count(*) from dbo.ITEMLOC
+Insert into @Count select 'dbo','ITEMMAST', count(*) from dbo.ITEMMAST
+Insert into @Count select 'dbo','ITEMSRC', count(*) from dbo.ITEMSRC
+Insert into @Count select 'tableau','Kanban', count(*) from tableau.Kanban
+Insert into @Count select 'dbo','MAINVDTL', count(*) from dbo.MAINVDTL
+Insert into @Count select 'dbo','MAINVMSG', count(*) from dbo.MAINVMSG
+Insert into @Count select 'bluebin','MasterLog', count(*) from bluebin.MasterLog
+Insert into @Count select 'dbo','MMDIST', count(*) from dbo.MMDIST
+Insert into @Count select 'dbo','POCODE', count(*) from dbo.POCODE
+Insert into @Count select 'dbo','POLINE', count(*) from dbo.POLINE
+Insert into @Count select 'dbo','POLINESRC', count(*) from dbo.POLINESRC
+Insert into @Count select 'dbo','PORECLINE', count(*) from dbo.PORECLINE
+Insert into @Count select 'dbo','POVAGRMTLN', count(*) from dbo.POVAGRMTLN
+Insert into @Count select 'dbo','PURCHORDER', count(*) from dbo.PURCHORDER
+Insert into @Count select 'dbo','REQHEADER', count(*) from dbo.REQHEADER
+Insert into @Count select 'dbo','REQLINE', count(*) from dbo.REQLINE
+Insert into @Count select 'dbo','REQUESTER', count(*) from dbo.REQUESTER
+Insert into @Count select 'dbo','RQLOC', count(*) from dbo.RQLOC
+Insert into @Count select 'tableau','Sourcing', count(*) from tableau.Sourcing
+Insert into @Count select 'bluebin','Training', count(*) from bluebin.Training
+Insert into @Count select 'bluebin','TrainingModule', count(*) from bluebin.TrainingModule--End
+select * from @Count  where [Schema] like '%' + @schema + '%' order by 1,2 asc
+
+END
+GO
+grant exec on ssp_TableSize to public
+GO
+
+
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+
+if exists (select * from dbo.sysobjects where id = object_id(N'ssp_Versions') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure ssp_Versions
+GO
+
+--exec ssp_Versions
+
+CREATE PROCEDURE ssp_Versions
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+DECLARE @DBTable TABLE (iid int identity (1,1) PRIMARY KEY,dbname varchar(50));
+DECLARE @DBUpdate TABLE (iid int identity (1,1) PRIMARY KEY,dbname varchar(50));
+Create table #Versions (dbname varchar(100),[Version] varchar(100))
+
+declare @iid int, @dbname varchar(50), @sql varchar(max), @sql2 varchar(max)
+
+
+insert @DBTable (dbname) select name from sys.databases 
+
+
+set @iid = 1
+While @iid <= (select MAX(iid) from @DBTable)
+BEGIN
+select @dbname = dbname from @DBTable where iid = @iid
+set @sql = 'Use ' + @DBName + 
+
+' 
+	if exists (select * from sys.tables where name = ''Config'')
+	BEGIN
+	insert into #versions (dbname,[Version])
+	select 
+		''' + @dbname + ''',
+		ConfigValue as Version
+	 from bluebin.Config where ConfigName = ''Version''
+	END
+'
+exec (@sql) 
+
+delete from #Versions where [Version] = ''
+set @iid = @iid +1
+END
+
+
+select * from #Versions order by 2 desc
+drop table #Versions
+
+END 
+GO
+grant exec on ssp_Versions to public
+GO
 
 --*****************************************************
 --**************************SPROC**********************
@@ -6081,6 +6900,139 @@ GO
 grant exec on sp_CleanLawsonTables to appusers
 GO
 
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'ssp_CleanLawson') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure ssp_CleanLawson
+GO
+
+--exec ssp_Versions
+
+CREATE PROCEDURE ssp_CleanLawson
+--WITH ENCRYPTION
+AS
+BEGIN
+
+truncate table bluebin.DimBin
+truncate table bluebin.FactIssue
+truncate table bluebin.FactScan
+truncate table tableau.Kanban
+truncate table tableau.Sourcing
+truncate table dbo.APCOMPANY
+truncate table dbo.APVENMAST
+truncate table dbo.BUYER
+truncate table dbo.GLCHARTDTL
+truncate table dbo.GLNAMES
+truncate table dbo.GLTRANS
+truncate table dbo.ICCATEGORY
+truncate table dbo.ICMANFCODE
+truncate table dbo.ICLOCATION
+truncate table dbo.ICTRANS
+truncate table dbo.ITEMLOC
+truncate table dbo.ITEMMAST
+truncate table dbo.ITEMSRC
+truncate table dbo.MAINVDTL
+truncate table dbo.MAINVMSG
+truncate table dbo.MMDIST
+truncate table dbo.POCODE
+truncate table dbo.POLINE
+truncate table dbo.POLINESRC
+truncate table dbo.PORECLINE
+truncate table dbo.POVAGRMTLN
+truncate table dbo.PURCHORDER
+truncate table dbo.REQHEADER
+truncate table dbo.REQLINE
+truncate table dbo.REQUESTER
+truncate table dbo.RQLOC
+
+END 
+GO
+grant exec on ssp_CleanLawson to public
+GO
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'ssp_CleanDB') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure ssp_CleanDB
+GO
+
+--exec ssp_Versions
+
+CREATE PROCEDURE ssp_CleanDB
+--WITH ENCRYPTION
+AS
+BEGIN
+truncate table bluebin.MasterLog
+truncate table bluebin.Image
+truncate table gemba.GembaAuditNode
+
+truncate table qcn.QCN
+truncate table bluebin.Training
+update bluebin.BlueBinResource set Active = 0
+delete from bluebin.BlueBinUser where UserLogin not like '%@bluebin.com%'
+truncate table bluebin.BlueBinParMaster
+truncate table scan.ScanLine
+truncate table scan.ScanBatch
+
+
+truncate table bluebin.DimBin
+truncate table bluebin.DimFacility
+truncate table bluebin.DimBinStatus
+truncate table bluebin.DimDate
+truncate table bluebin.DimItem
+truncate table bluebin.DimLocation
+truncate table bluebin.DimSnapshotDate
+truncate table bluebin.FactBinSnapshot
+truncate table bluebin.DimWarehouseItem
+truncate table bluebin.FactBinSnapshot
+truncate table bluebin.FactIssue
+truncate table bluebin.FactScan
+truncate table bluebin.FactWarehouseSnapshot
+
+truncate table dbo.APCOMPANY
+truncate table dbo.APVENMAST
+truncate table dbo.BUYER
+truncate table dbo.GLCHARTDTL
+truncate table dbo.GLNAMES
+truncate table dbo.GLTRANS
+truncate table dbo.ICCATEGORY
+truncate table dbo.ICMANFCODE
+truncate table dbo.ICLOCATION
+truncate table dbo.ICTRANS
+truncate table dbo.ITEMLOC
+truncate table dbo.ITEMMAST
+truncate table dbo.ITEMSRC
+truncate table dbo.MAINVDTL
+truncate table dbo.MAINVMSG
+truncate table dbo.MMDIST
+truncate table dbo.POCODE
+truncate table dbo.POLINE
+truncate table dbo.POLINESRC
+truncate table dbo.PORECLINE
+truncate table dbo.POVAGRMTLN
+truncate table dbo.PURCHORDER
+truncate table dbo.REQHEADER
+truncate table dbo.REQLINE
+truncate table dbo.REQUESTER
+truncate table dbo.RQLOC
+
+truncate table etl.JobHeader
+truncate table etl.JobDetails
+
+truncate table tableau.Kanban
+truncate table tableau.Contracts
+truncate table tableau.Sourcing
+
+update scan.ScanBatch set Active =0
+END 
+GO
+grant exec on ssp_CleanDB to public
+GO
+
+
 Print 'SSP Sproc Add/Updates Complete'
 
 
@@ -6104,14 +7056,14 @@ BEGIN
 SET NOCOUNT ON
 
 --If there is nothing to extract skip to the end
-if not exists(select * from scan.ScanBatch where Extracted = 0) 
+if not exists(select * from scan.ScanLine where Extract = 1) 
 BEGIN
 GOTO THEEND
 END
 
 --Declare all paramters and parameter table
 Declare @RQ500User varchar(100), @RQ500FromLoc varchar(5), @RQ500FromComp varchar(5), @RQ500Account varchar(6), @RQ500SubAccount varchar(4), @RQ500AccountCat varchar(5), @RQ500AccountUnit varchar(15)
-DECLARE @Batch TABLE (iid int identity (1,1) PRIMARY KEY,ScanBatchID int,FacilityID int,LocationID char(7),RQ500User varchar(100),Extracted int,ScanDateTime datetime,RQ500FromLoc varchar(5),RQ500FromComp varchar(4))
+DECLARE @Batch TABLE (iid int identity (1,1) PRIMARY KEY,ScanBatchID int,FacilityID int,LocationID char(7),RQ500User varchar(100),Extract int,ScanDateTime datetime,RQ500FromLoc varchar(5),RQ500FromComp varchar(4))
 declare @iid int, @ScanBatchID int
 
 --Set The REQUESTER for the batch to be a generic value in bluebin.Config if set
@@ -6132,7 +7084,7 @@ select @RQ500SubAccount = ConfigValue from bluebin.Config where ConfigName = 'RQ
 
 
 --Create data set of all the Batches that need to be extracted
-insert into @Batch (ScanBatchID,FacilityID,LocationID,RQ500User,Extracted,ScanDateTime,RQ500FromLoc,RQ500FromComp) 
+insert into @Batch (ScanBatchID,FacilityID,LocationID,RQ500User,ScanDateTime,RQ500FromLoc,RQ500FromComp) 
 select 
 	sb.ScanBatchID,
 	sb.FacilityID,
@@ -6143,14 +7095,13 @@ select
 			case when @RQ500User = '' or @RQ500User is null then 'Invalid Requester' else @RQ500User end 
 			else bu.ERPUser end
 			,
-	sb.Extracted,
 	ScanDateTime,
 	@RQ500FromLoc,
 	@RQ500FromComp
 from scan.ScanBatch sb
 	left join bluebin.BlueBinUser bu on sb.BlueBinUserID = bu.BlueBinUserID 
-where sb.Extracted = 0 
-		and sb.ScanBatchID in (select ScanBatchID from scan.ScanLine where Extracted = 0)
+where ScanType like '%Order'
+		and sb.ScanBatchID in (select ScanBatchID from scan.ScanLine where Extract = 1)
 			and convert(varchar(4),FacilityID) like '%' + @Facility + '%'
 
 ;
@@ -6216,14 +7167,17 @@ With C as (
 	left(sb.LocationID+SPACE(5),5)+												--Req Location 5, 183-187
 	convert(varchar, sb.ScanDateTime, 112)+										--Req Delivery Date 8, 188-195
 	convert(varchar, sb.ScanDateTime+1, 112)+									--Late Delivery Date 8, 196-203
-	convert(varchar, sb.ScanDateTime, 112)+										--Creation Date 8, 204-211
+	SPACE(8)+																	--Creation Date 8, 204-211
+	--convert(varchar, sb.ScanDateTime, 112)+									--Creation Date 8, 204-211
 	SPACE(89)+																	--Spaces 89, 212-300
 	'01'+																		--Priority 2, 301-302, default it to 01
 	SPACE(80)+																	--80 Spaces, 303-382
 	left(@RQ500AccountUnit+SPACE(15),15)+										--Account Unit 15, 383-397
 	right((REPLICATE('0',6) + @RQ500Account),6)+								--Account 6, 398-403
 	right((REPLICATE('0',4) + @RQ500SubAccount),4)+								--Sub Account 4, 404-407
-	SPACE(122)+																	--Spaces 122, 408-529
+	SPACE(103)+																	--Spaces 103, 408-510
+	right((REPLICATE('0',4) + rtrim(convert(varchar(4),rtrim(sb.RQ500FromComp)))),4)+--Distribution (From) Company 4, 511-514
+	SPACE(15)+																	--Spaces 15, 515-529
 	left(@RQ500AccountCat+SPACE(5),5)+											--Accounting Category 5, 530-534
 	SPACE(42)+																	--Spaces 42, 535-576
 	'0000000000'+																--Asset Number 10, 577-586 default all zeroes
@@ -6234,24 +7188,24 @@ With C as (
 	from @Batch sb
 	inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
 	inner join bluebin.DimItem di on sl.ItemID = di.ItemID
-	where sl.Extracted = 0 and sb.RQ500User <> 'Invalid Requester' 
+	where sl.Extract = 1 and sb.RQ500User <> 'Invalid Requester' and sl.Line <> 0 
 	
 	) 
 	select Content from C order by ScanBatchID,Line
 	;
-	update scan.ScanBatch set Extracted = 1 where ScanBatchID in (select ScanBatchID from @Batch where RQ500User <> 'Invalid Requester')
-	update scan.ScanLine set Extracted = 1 where ScanBatchID  in (select ScanBatchID from @Batch where RQ500User <> 'Invalid Requester')
+	update scan.ScanBatch set Extract = 0 where ScanBatchID in (select ScanBatchID from @Batch where RQ500User <> 'Invalid Requester')
+	update scan.ScanLine set Extract = 0 where ScanBatchID  in (select ScanBatchID from @Batch where RQ500User <> 'Invalid Requester')
 THEEND:
 
 /*
 select * from scan.ScanBatch
 select * from scan.ScanLine
 select * from bluebin.DimLocation
-update scan.ScanBatch set Extracted = 0 where ScanBatchID in (10,11,12)
-update scan.ScanLine set Extracted = 0 where ScanBatchID in (10,11,12)
+update scan.ScanBatch set Extract = 1 where ScanBatchID in (10,11,12)
+update scan.ScanLine set Extract = 1 where ScanBatchID in (10,11,12)
 exec xp_RQ500ScanBatchS ''
 declare @ScanBatchID int 
-select @ScanBatchID = min(ScanBatchID) from scan.ScanBatch where Active = 1 and Extracted = 0
+select @ScanBatchID = min(ScanBatchID) from scan.ScanBatch where Active = 1 and Extract = 1
 */
 
 END
@@ -6259,6 +7213,8 @@ GO
 
 grant exec on xp_RQ500ScanBatchS to BlueBin_RQ500User
 GO
+
+
 Print 'Interface Sproc Updates Complete'
 --*************************************************************************************************************************************************
 --Grant Exec
@@ -6312,7 +7268,7 @@ Print 'Job Updates Complete'
 --Version Update
 --*************************************************************************************************************************************************
 
-declare @version varchar(50) = '2.3.20160603' --Update Version Number here
+declare @version varchar(50) = '2.3.20160727' --Update Version Number here
 
 
 if not exists (select * from bluebin.Config where ConfigName = 'Version')

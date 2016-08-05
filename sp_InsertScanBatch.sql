@@ -20,22 +20,23 @@ CREATE PROCEDURE sp_InsertScanBatch
 AS
 BEGIN
 SET NOCOUNT ON
-declare @FacilityID int
+declare @FacilityID int, @AutoExtractScans int
+select @AutoExtractScans = ConfigValue from bluebin.Config where ConfigName = 'AutoExtractScans'
 select @FacilityID = max(LocationFacility) from bluebin.DimLocation where rtrim(LocationID) = rtrim(@Location)--Only grab one FacilityID or else bad things will happen
 
-insert into scan.ScanBatch (FacilityID,LocationID,BlueBinUserID,Active,ScanDateTime,Extracted,ScanType)
+insert into scan.ScanBatch (FacilityID,LocationID,BlueBinUserID,Active,ScanDateTime,Extract,ScanType)
 select 
 @FacilityID,
 @Location,
 (select BlueBinUserID from bluebin.BlueBinUser where LOWER(UserLogin) = LOWER(@Scanner)),
 1, --Default Active to Yes
 getdate(),
-0, --Default Extracted to No,
+@AutoExtractScans, --Default Extract to value from ,
 @ScanType
 
 Declare @ScanBatchID int  = SCOPE_IDENTITY()
 
-if @ScanType = 'Order'
+if @ScanType = 'ScanOrder'
 BEGIN
 exec sp_InsertMasterLog @Scanner,'Scan','New Scan Batch OrderEntered',@ScanBatchID
 END ELSE

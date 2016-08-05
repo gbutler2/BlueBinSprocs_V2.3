@@ -2550,23 +2550,27 @@ GO
 if exists (select * from dbo.sysobjects where id = object_id(N'tb_PickLines') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure tb_PickLines
 GO
-
+--exec tb_PickLines
 CREATE PROCEDURE tb_PickLines
 AS
 BEGIN
 SET NOCOUNT ON
 
 
-SELECT Cast(IssueDate AS DATE) AS Date,
-       Count(*)                AS PickLine
-FROM   bluebin.FactIssue
-GROUP  BY Cast(IssueDate AS DATE)
+SELECT 
+df.FacilityName,
+Cast(fi.IssueDate AS DATE) AS Date,
+Count(*) AS PickLine
+FROM   bluebin.FactIssue fi
+inner join bluebin.DimFacility df on fi.ShipFacilityKey = df.FacilityID
+GROUP  BY df.FacilityName,Cast(fi.IssueDate AS DATE)
 
 
 END
 GO
 grant exec on tb_PickLines to public
 GO
+
 
 
 --*********************************************************************************************
@@ -2987,7 +2991,7 @@ left join
 						 inner join (select FacilityID, LocationID,ItemID,count(*) as Ct from bluebin.DimBinHistory group by FacilityID, LocationID,ItemID) changed on d2.FacilityID = changed.FacilityID and d2.LocationID = changed.LocationID and d2.ItemID = changed.ItemID and changed.Ct > 1
 						group by d2.FacilityID, d2.LocationID,d2.ItemID,d2.BinQty,d2.LastUpdated) as a where Num = 2) dbh2 on dbh.FacilityID = dbh2.FacilityID and dbh.LocationID = dbh2.LocationID and dbh.ItemID = dbh2.ItemID 
 
-where a.[Date] >= getdate() -7 and ((a.OrderQty<>a.BinQty and a.OrderQty is not null) or dbh2.BinQty is not null)
+where a.[Date] >= getdate() -7 and ((a.OrderQty<>a.BinQty and a.OrderQty is not null) or dbh2.BinQty is not null)  and ScanHistseq > 1
 --and a.LocationID = 'B7435' and a.ItemID = '30003' 
 order by FacilityID,LocationID,ItemID
 
@@ -3136,6 +3140,7 @@ With list as
 select 
 convert(datetime,(convert(DATE,getdate()-1)),112) as CREATION_DATE,
 [list].COMPANY,
+df.FacilityName as FacilityName,
 [list].REQ_LOCATION,
 [list].LocationName,
 ISNULL([current].Lines,0) as TodayLines,
@@ -3147,7 +3152,8 @@ case
 
 from 
 
-list		
+list
+inner join bluebin.DimFacility df on list.COMPANY = df.FacilityID		
 --Yesterdays Data
 left join(
 			select 
@@ -3189,7 +3195,6 @@ order by [list].REQ_LOCATION
 GO
 grant exec on tb_TodaysOrders to public
 GO
-
 
 
 
@@ -3449,6 +3454,11 @@ GO
 grant exec on tb_CurrentStockOuts to public
 GO
 
+
+--*********************************************************************************************
+--Tableau Sproc  These load data into the datasources for Tableau
+--*********************************************************************************************
+
 --*********************************************************************************************
 --Tableau Sproc  These load data into the datasources for Tableau
 --*********************************************************************************************
@@ -3465,6 +3475,8 @@ GO
 CREATE PROCEDURE tb_HealthTrends
 
 AS
+
+
 
 
 WITH A as (
@@ -3508,8 +3520,39 @@ df.FacilityName,
 dl.LocationID,
 dl.LocationName,
 A.BinStatus 
+
 GO
 
 grant exec on tb_HealthTrends to public
 GO
 
+
+
+
+--*********************************************************************************************
+--Tableau Sproc  These load data into the datasources for Tableau
+--*********************************************************************************************
+if exists (select * from dbo.sysobjects where id = object_id(N'tb_HBPickLines') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure tb_HBPickLines
+GO
+--exec tb_HBPickLines
+CREATE PROCEDURE tb_HBPickLines
+AS
+BEGIN
+SET NOCOUNT ON
+
+
+SELECT 
+df.FacilityName,
+Cast(fi.IssueDate AS DATE) AS Date,
+Count(*) AS PickLine
+FROM   bluebin.FactIssue fi
+inner join bluebin.DimFacility df on fi.ShipFacilityKey = df.FacilityID
+where fi.IssueDate > getdate() -15
+GROUP  BY df.FacilityName,Cast(fi.IssueDate AS DATE)
+
+
+END
+GO
+grant exec on tb_HBPickLines to public
+GO

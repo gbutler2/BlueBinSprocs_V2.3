@@ -2,7 +2,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'tb_LineVolume') a
 drop procedure tb_LineVolume
 GO
 
-
+--exec tb_LineVolume
 
 CREATE PROCEDURE tb_LineVolume
 
@@ -35,7 +35,7 @@ FROM   REQLINE a
        INNER JOIN GLNAMES c
                ON b.COMPANY = c.COMPANY
                   AND b.ISS_ACCT_UNIT = c.ACCT_UNIT 
-	   INNER JOIN bluebin.DimFacility df on a.COMPANY = df.FacilityID
+	   INNER JOIN bluebin.DimFacility df on rtrim(a.COMPANY) = rtrim(df.FacilityID)
 order by 2
 END
 GO

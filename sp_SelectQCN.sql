@@ -2,10 +2,12 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCN') an
 drop procedure sp_SelectQCN
 GO
 
-
---exec sp_SelectQCN '%','0','%'
+--select * from qcn.QCN
+--exec sp_SelectQCN '%','%','%','0','%'
 CREATE PROCEDURE sp_SelectQCN
-@LocationName varchar(50)
+@FacilityName varchar(50)
+,@LocationName varchar(50)
+,@QCNStatusName varchar(255)
 ,@Completed int
 ,@AssignedUserName varchar(50)
 
@@ -23,23 +25,24 @@ end
 
 select 
 	q.[QCNID],
+	q.FacilityID,
+	df.FacilityName,
 	q.[LocationID],
     case
-		when dl.LocationID = dl.LocationName then dl.LocationID
-		else dl.LocationID + ' - ' + dl.[LocationName] end as LocationName,
-	u.LastName + ', ' + u.FirstName  as RequesterUserName,
-        u.[Login] as RequesterLogin,
-    u.[Title] as RequesterTitleName,
-    case when v.Login is null then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
-        ISNULL(v.[Login],'') as AssignedLogin,
+		when q.[LocationID] = 'Multiple' then q.LocationID
+		else case	when dl.LocationID = dl.LocationName then dl.LocationID
+					else dl.LocationID + ' - ' + dl.[LocationName] end end as LocationName,
+	RequesterUserID  as RequesterUserName,
+	ApprovedBy as ApprovedBy,
+    case when v.UserLogin is null then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
+        ISNULL(v.[UserLogin],'') as AssignedLogin,
     ISNULL(v.[Title],'') as AssignedTitleName,
 	qt.Name as QCNType,
 q.[ItemID],
 COALESCE(di.ItemClinicalDescription,di.ItemDescription,'No Description') as ItemClinicalDescription,
-db.[BinQty] as Par,
-db.[BinUOM] as UOM,
-di.[ItemManufacturer],
-di.[ItemManufacturerNumber],
+q.Par,
+q.UOM,
+q.ManuNumName,
 	q.[Details] as [DetailsText],
             case when q.[Details] ='' then 'No' else 'Yes' end Details,
 	q.[Updates] as [UpdatesText],
@@ -49,20 +52,23 @@ di.[ItemManufacturerNumber],
             q.[DateEntered],
 	q.[DateCompleted],
 	qs.Status,
-    case when db.BinCurrentStatus is null then 'N/A' else db.BinCurrentStatus end as BinStatus,
     q.[LastUpdated],
-	q.InternalReference
+	q.InternalReference,
+	qc.Name as Complexity
 from [qcn].[QCN] q
-left join [bluebin].[DimBin] db on q.LocationID = db.LocationID and rtrim(q.ItemID) = rtrim(db.ItemID)
+--left join [bluebin].[DimBin] db on q.LocationID = db.LocationID and rtrim(q.ItemID) = rtrim(db.ItemID)
 left join [bluebin].[DimItem] di on rtrim(q.ItemID) = rtrim(di.ItemID)
-        inner join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
-inner join [bluebin].[BlueBinResource] u on q.RequesterUserID = u.BlueBinResourceID
-left join [bluebin].[BlueBinResource] v on q.AssignedUserID = v.BlueBinResourceID
+        left join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
+		left join [bluebin].[DimFacility] df on q.FacilityID = df.FacilityID
+left join [bluebin].[BlueBinUser] v on q.AssignedUserID = v.BlueBinUserID
 inner join [qcn].[QCNType] qt on q.QCNTypeID = qt.QCNTypeID
 inner join [qcn].[QCNStatus] qs on q.QCNStatusID = qs.QCNStatusID
+left join qcn.QCNComplexity qc on q.QCNCID = qc.QCNCID
 
 WHERE q.Active = 1 
-and dl.LocationID + ' - ' + dl.[LocationName] LIKE '%' + @LocationName + '%' 
+and df.FacilityName like '%' + @FacilityName + '%'
+and (dl.LocationID + ' - ' + dl.[LocationName] LIKE '%' + @LocationName + '%' or q.LocationID like '%' + @LocationName + '%')
+and qs.Status LIKE '%' + @QCNStatusName + '%'
 and q.QCNStatusID not in (@QCNStatus,@QCNStatus2)
 and case	
 		when @AssignedUserName <> '%' then v.LastName + ', ' + v.FirstName else '' end LIKE  '%' + @AssignedUserName + '%' 

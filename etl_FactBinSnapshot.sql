@@ -78,6 +78,7 @@ WHERE  BinGoLiveDate <= Date
 SELECT DISTINCT BinKey
 INTO #tmpScannedBins
 FROM   bluebin.FactScan
+where ScanHistseq > (select ConfigValue from bluebin.Config where ConfigName = 'ScanThreshold')
 
 
 /***********************************		CREATE FactBinSnapshot		*******************************************/

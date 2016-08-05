@@ -43,7 +43,10 @@ CREATE TABLE [bluebin].[ConesDeployed](
 	ConeReturned int NULL,
 	Returned datetime NULL,
 	Deleted int null,
-	LastUpdated datetime not null
+	LastUpdated datetime not null,
+	ExpectedDelivery datetime null,
+	SubProduct varchar(3) not null,
+	Details varchar(255) null
 	
 )
 
@@ -150,7 +153,8 @@ CREATE TABLE [bluebin].[BlueBinUser](
 	[PasswordExpires] int not null,
 	[LastUpdated] datetime not null,
 	GembaTier varchar(50) null,
-	ERPUser varchar(10) null
+	ERPUser varchar(60) null,
+	AssignToQCN int
 )
 
 ALTER TABLE [bluebin].[MasterLog] WITH CHECK ADD FOREIGN KEY([BlueBinUserID])

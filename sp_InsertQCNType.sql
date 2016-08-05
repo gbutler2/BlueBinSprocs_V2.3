@@ -5,7 +5,8 @@ GO
 --exec sp_InsertQCNType 'TEST'
 
 CREATE PROCEDURE sp_InsertQCNType
-@Name varchar (255)
+@Name varchar (255),
+@Description varchar(100)
 
 
 
@@ -17,7 +18,7 @@ if exists(select * from qcn.QCNType where Name = @Name)
 BEGIN
 GOTO THEEND
 END
-insert into qcn.QCNType (Name,Active,LastUpdated) VALUES (@Name,1,getdate())
+insert into qcn.QCNType (Name,Active,LastUpdated,Description) VALUES (@Name,1,getdate(),@Description)
 
 END
 THEEND:

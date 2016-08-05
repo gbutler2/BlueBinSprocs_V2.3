@@ -15,14 +15,18 @@ SET NOCOUNT ON
 	SELECT 
 	cd.ConesDeployedID,
 	cd.Deployed,
+	cd.ExpectedDelivery,
 	df.FacilityID,
 	df.FacilityName,
 	dl.LocationID,
 	dl.LocationName,
 	di.ItemID,
 	di.ItemDescription,
+	cd.SubProduct,
 	db.BinSequence,
-	case when so.ItemID is not null then 'Yes' else 'No' end as DashboardStockout
+	case when so.ItemID is not null then 'Yes' else 'No' end as DashboardStockout,
+	cd.Details as DetailsText,
+	case when Details is null or Details = '' then 'No' else 'Yes' end as Details
 	
 	FROM bluebin.[ConesDeployed] cd
 	inner join bluebin.DimFacility df on cd.FacilityID = df.FacilityID

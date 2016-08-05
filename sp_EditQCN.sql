@@ -6,15 +6,22 @@ GO
 
 CREATE PROCEDURE sp_EditQCN
 @QCNID int,
+@FacilityID int,
 @LocationID varchar(10),
 @ItemID varchar(32),
+@ClinicalDescription varchar(30),
 @Requester varchar(255),
-@Assigned varchar(255),
+@ApprovedBy varchar(255),
+@Assigned int,
+@QCNComplexity varchar(255),
 @QCNType varchar(255),
 @Details varchar(max),
 @Updates varchar(max),
 @QCNStatus varchar(255),
-@InternalReference varchar(50)
+@InternalReference varchar(50),
+@ManuNumName varchar(60),
+@Par int,
+@UOM varchar(10)
 
 
 --WITH ENCRYPTION
@@ -23,10 +30,14 @@ BEGIN
 SET NOCOUNT ON
 	
 update [qcn].[QCN] set
+FacilityID = @FacilityID,
 [LocationID] = @LocationID,
 [ItemID] = @ItemID,
-[RequesterUserID] = (select [BlueBinResourceID] from [bluebin].[BlueBinResource] where LastName + ', ' + FirstName + ' (' + Login + ')' = @Requester),
-[AssignedUserID] = (select [BlueBinResourceID] from [bluebin].[BlueBinResource] where LastName + ', ' + FirstName + ' (' + Login + ')' = @Assigned),
+ClinicalDescription = @ClinicalDescription,
+[RequesterUserID] = @Requester,
+ApprovedBy = @ApprovedBy,
+[AssignedUserID] = @Assigned,
+[QCNCID] =  @QCNComplexity,
 [QCNTypeID] = (select [QCNTypeID] from [qcn].[QCNType] where [Name] = @QCNType),
 [Details] = @Details,
 [Updates] = @Updates,
@@ -35,7 +46,10 @@ update [qcn].[QCN] set
                             else NULL end,
 [QCNStatusID] = (select [QCNStatusID] from [qcn].[QCNStatus] where [Status] = @QCNStatus),
 [LastUpdated] = getdate(),
-InternalReference = @InternalReference
+InternalReference = @InternalReference,
+ManuNumName = @ManuNumName,
+Par = @Par,
+UOM = @UOM
 WHERE QCNID = @QCNID
 
 

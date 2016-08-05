@@ -16,6 +16,8 @@ CREATE PROCEDURE tb_HealthTrends
 AS
 
 
+
+
 WITH A as (
 select
 [Date],
@@ -57,6 +59,7 @@ df.FacilityName,
 dl.LocationID,
 dl.LocationName,
 A.BinStatus 
+
 GO
 
 grant exec on tb_HealthTrends to public

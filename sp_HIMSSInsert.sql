@@ -21,14 +21,15 @@ SET NOCOUNT ON
 declare @FacilityID int
 select @FacilityID = max(LocationFacility) from bluebin.DimLocation where rtrim(LocationID) = rtrim(@Location)--Only grab one FacilityID or else bad things will happen
 
-insert into scan.ScanBatch (FacilityID,LocationID,BlueBinUserID,Active,ScanDateTime,Extracted)
+insert into scan.ScanBatch (FacilityID,LocationID,BlueBinUserID,Active,ScanDateTime,Extracted,ScanType)
 select 
 @FacilityID,
 @Location,
 (select BlueBinUserID from bluebin.BlueBinUser where LOWER(UserLogin) = LOWER(@Scanner)),
 1, --Default Active to Yes
 getdate(),
-0 --Default Extracted to No
+0, --Default Extracted to No
+'TrayOrder' --Default to TrayOrder for demo purposes
 
 Declare @ScanBatchID int  = SCOPE_IDENTITY()
 

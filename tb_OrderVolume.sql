@@ -24,12 +24,14 @@ rq.LINE_NBR as Lines,
 r.NAME,
 dl.BlueBinFlag
 from REQLINE rq
-inner join bluebin.DimLocation dl on rq.COMPANY = dl.LocationFacility and rq.REQ_LOCATION = dl.LocationID
+inner join bluebin.DimLocation dl on rtrim(rq.COMPANY) = rtrim(dl.LocationFacility) and rq.REQ_LOCATION = dl.LocationID
+inner join bluebin.DimFacility df on rtrim(rq.COMPANY) = rtrim(df.FacilityID)
 inner join REQHEADER rh on rq.REQ_NUMBER = rh.REQ_NUMBER
 left join REQUESTER r on rh.REQUESTER = r.REQUESTER and rq.COMPANY = r.COMPANY
-inner join bluebin.DimFacility df on rq.COMPANY = df.FacilityID
---inner join REQUESTER r on rh.REQUESTER = r.REQUESTER
 where rq.CREATION_DATE > getdate()-15
+
+
+
 
 
 

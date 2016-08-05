@@ -14,41 +14,43 @@ select
 	q.[QCNID],
 	df.FacilityName,
 	q.[LocationID],
-        dl.[LocationName],
+        case
+		when q.[LocationID] = 'Multiple' then q.LocationID
+		else dl.[LocationName] end as LocationName,
 		db.BinSequence,
-	u.LastName + ', ' + u.FirstName  as RequesterUserName,
-        u.[Login] as RequesterLogin,
-    u.[Title] as RequesterTitleName,
-    case when v.Login = 'None' then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
-        v.[Login] as AssignedLogin,
+	q.RequesterUserID  as RequesterUserName,
+        '' as RequesterLogin,
+    '' as RequesterTitleName,
+    case when v.UserLogin = 'None' then '' else v.LastName + ', ' + v.FirstName end as AssignedUserName,
+        v.[UserLogin] as AssignedLogin,
     v.[Title] as AssignedTitleName,
 	qt.Name as QCNType,
 q.[ItemID],
 di.[ItemClinicalDescription],
-db.[BinQty] as Par,
-db.[BinUOM] as UOM,
-di.[ItemManufacturer],
-di.[ItemManufacturerNumber],
+q.Par as Par,
+q.UOM as UOM,
+q.ManuNumName as [ItemManufacturer],
+q.ManuNumName as [ItemManufacturerNumber],
 	q.[Details] as [DetailsText],
             case when q.[Details] ='' then 'No' else 'Yes' end Details,
 	q.[Updates] as [UpdatesText],
             case when q.[Updates] ='' then 'No' else 'Yes' end Updates,
-	case when qs.Status = 'Completed' then convert(int,(q.[DateCompleted] - q.[DateEntered]))
+	case when qs.Status in ('Completed','Rejected') then convert(int,(q.[DateCompleted] - q.[DateEntered]))
 		else convert(int,(getdate() - q.[DateEntered])) end as DaysOpen,
-            q.[DateEntered],
+    q.[DateEntered],
 	q.[DateCompleted],
 	qs.Status,
-    case when db.BinCurrentStatus is null then 'N/A' else db.BinCurrentStatus end as BinStatus,
+    '' as BinStatus,
     q.[LastUpdated]
 from [qcn].[QCN] q
 left join [bluebin].[DimBin] db on q.LocationID = db.LocationID and rtrim(q.ItemID) = rtrim(db.ItemID)
 left join [bluebin].[DimItem] di on rtrim(q.ItemID) = rtrim(di.ItemID)
-        inner join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
-inner join [bluebin].[BlueBinResource] u on q.RequesterUserID = u.BlueBinResourceID
-left join [bluebin].[BlueBinResource] v on q.AssignedUserID = v.BlueBinResourceID
+        left join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
+--inner join [bluebin].[BlueBinResource] u on q.RequesterUserID = u.BlueBinResourceID
+left join [bluebin].[BlueBinUser] v on q.AssignedUserID = v.BlueBinUserID
 inner join [qcn].[QCNType] qt on q.QCNTypeID = qt.QCNTypeID
 inner join [qcn].[QCNStatus] qs on q.QCNStatusID = qs.QCNStatusID
-left join bluebin.DimFacility df on dl.LocationFacility = df.FacilityID
+left join bluebin.DimFacility df on q.FacilityID = df.FacilityID
 
 WHERE q.Active = 1 
             order by q.[DateEntered] asc--,convert(int,(getdate() - q.[DateEntered])) desc

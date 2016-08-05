@@ -21,7 +21,7 @@ sb.ScanDateTime as ScanDateTime
 from 
 scan.ScanBatch sb
 inner join scan.ScanLine sl on sb.ScanBatchID = sl.ScanBatchID
-where sb.Extracted = 0
+where sl.Extract = 1
 
 FOR XML PATH('ScanBatch'), ROOT('Scans')
 

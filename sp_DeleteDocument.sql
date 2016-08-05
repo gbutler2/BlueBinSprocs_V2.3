@@ -2,7 +2,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_DeleteDocument
 drop procedure sp_DeleteDocument
 GO
 
-
+--select * from bluebin.Document
 --exec sp_DeleteDocument 'gbutler@bluebin.com','1'
 CREATE PROCEDURE sp_DeleteDocument
 @UserLogin varchar(60),

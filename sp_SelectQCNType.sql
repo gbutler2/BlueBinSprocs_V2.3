@@ -13,6 +13,7 @@ SET NOCOUNT ON
 	SELECT 
 	QCNTypeID,
 	Name,
+	Description,
 	case 
 		when Active = 1 then 'Yes' 
 		Else 'No' 

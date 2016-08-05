@@ -38,6 +38,11 @@ SET NOCOUNT ON
       ,[Email]
 	  ,GembaTier
 	  ,ERPUser
+	  ,case 
+		when [AssignToQCN] = 1 then 'Yes' 
+		Else 'No' 
+		end as AssignToQCNName
+		,AssignToQCN
   FROM [bluebin].[BlueBinUser] bbu
   inner join bluebin.BlueBinRoles bbur on bbu.RoleID = bbur.RoleID
   where UserLogin <> ''
