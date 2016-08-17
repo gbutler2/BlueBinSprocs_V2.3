@@ -24,6 +24,7 @@ where bbu.Active = 1
   and
   ([LastName] like '%' + @Name + '%' 
 	OR [FirstName] like '%' + @Name + '%' )
+	or bbo.OpName like '%' + @Name + '%' 
 order by bbu.LastName + ', ' + FirstName,bbo.OpName
 
 END

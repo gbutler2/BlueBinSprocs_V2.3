@@ -8,21 +8,52 @@ CREATE PROCEDURE [dbo].[etl_DimBinHistory]
 	
 AS
 
+
+/*
+select * from bluebin.DimBinHistory where LastSequence = 'N/A' order by FacilityID,LocationID,ItemID,Date
+select * from bluebin.DimBin where LocationID = 'B6183' and ItemID = '700'  
+select * from tableau.Kanban where LocationID = 'B6183' and ItemID = '700' and convert(Date,[Date]) = convert(Date,getdate()-1)
+update bluebin.DimBinHistory set LastUpdated = getdate() -3 where DimBinHistoryID = 6161
+truncate table bluebin.DimBinHistory
+*/
+Delete from bluebin.DimBinHistory where [Date] < convert(Date,getdate()-100)
+
+
+IF (select count(*) from bluebin.DimBinHistory) < 1
+BEGIN
+insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+select convert(Date,getdate()-2),BinKey,BinFacility,LocationID,ItemID,BinQty,BinUOM,BinSequence,BinQty,BinUOM,BinSequence from bluebin.DimBin
+
+insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+select convert(Date,getdate()-1),BinKey,BinFacility,LocationID,ItemID,BinQty,BinUOM,BinSequence,BinQty,BinUOM,BinSequence from bluebin.DimBin
+END
+
+if not exists (select * from bluebin.DimBinHistory where [Date] = convert(Date,getdate()-1))
 BEGIN
 
-if not exists (select * from bluebin.DimBinHistory where LastUpdated = convert(date,getdate()))
-BEGIN
-insert into bluebin.DimBinHistory 
-select BinFacility,LocationID,ItemID,BinQty,getdate() from bluebin.DimBin
-END
-ELSE	
-	BEGIN
-	update bluebin.DimBinHistory set BinQty = a.Q, LastUpdated = getdate()
-		from (select BinFacility as bf,LocationID as lid,ItemID as iid,BinQty as Q from bluebin.DimBin) as a
-	where FacilityID = a.bf and LocationID = a.lid and ItemID = a.iid and LastUpdated = convert(date,getdate()) and BinQty <> a.Q
-	END
+insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+select convert(Date,getdate()-1),db.BinKey,db.BinFacility,db.LocationID,db.ItemID,convert(int,db.BinQty),db.BinUOM,db.BinSequence,ISNULL(dbh.BinQty,0),ISNULL(dbh.LastBinUOM,'N/A'),ISNULL(dbh.LastSequence,'N/A')
+from bluebin.DimBin db
+left join bluebin.DimBinHistory dbh on db.BinFacility = dbh.FacilityID and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and dbh.[Date] = convert(Date,getdate()-2)
 END
 
+
+--if exists (select * from bluebin.DimBinHistory where [Date] = convert(Date,getdate()))
+--BEGIN
+--delete from bluebin.DimBinHistory where [Date] = convert(Date,getdate())
+--END
+
+
+--insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+--select convert(Date,getdate()),db.BinKey,db.BinFacility,db.LocationID,db.ItemID,convert(int,db.BinQty),db.BinUOM,db.BinSequence,ISNULL(dbh.BinQty,0),ISNULL(dbh.LastBinUOM,'N/A'),ISNULL(dbh.LastSequence,'N/A')
+--from bluebin.DimBin db
+--left join bluebin.DimBinHistory dbh on db.BinFacility = dbh.FacilityID and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and dbh.[Date] = convert(Date,getdate()-1)
+
+
+GO
+UPDATE etl.JobSteps
+SET LastModifiedDate = GETDATE()
+WHERE StepName = 'DimBinHistory'
 
 GO
 grant exec on etl_DimBinHistory to public

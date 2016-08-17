@@ -14,6 +14,7 @@ SET NOCOUNT ON
 	SELECT 
 	cd.ConeDeployed,
 	cd.Deployed,
+	cd.ExpectedDelivery,
 	cd.ConeReturned,
 	cd.Returned,
 	df.FacilityID,
@@ -23,6 +24,7 @@ SET NOCOUNT ON
 	di.ItemID,
 	di.ItemDescription,
 	db.BinSequence,
+	cd.SubProduct,
 	other.LocationID as AllLocations
 	
 	FROM bluebin.[ConesDeployed] cd

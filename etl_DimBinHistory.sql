@@ -10,56 +10,45 @@ AS
 
 
 /*
-select * from bluebin.DimBinHistory where LocationID = 'B6183' and ItemID = '700'
+select * from bluebin.DimBinHistory where LastSequence = 'N/A' order by FacilityID,LocationID,ItemID,Date
 select * from bluebin.DimBin where LocationID = 'B6183' and ItemID = '700'  
 select * from tableau.Kanban where LocationID = 'B6183' and ItemID = '700' and convert(Date,[Date]) = convert(Date,getdate()-1)
 update bluebin.DimBinHistory set LastUpdated = getdate() -3 where DimBinHistoryID = 6161
+truncate table bluebin.DimBinHistory
 */
-update bluebin.DimBinHistory set BinQty = a.Q
-from (
-		select 
-			db.FacilityID as fid,
-			db.LocationID as lid,
-			db.ItemID as iid,
-			convert(int,dbh.BinQty) as Q,
-			convert(Date,getdate()) as lu
-			--into #BinChange
-			from (
-					select Row_number()
-						OVER(Partition BY FacilityID,LocationID,ItemID
-							ORDER BY LastUpdated desc) as Num,
-						FacilityID,
-						LocationID,
-						ItemID,
-						BinQty,
-						LastUpdated
-					from
-					bluebin.DimBinHistory) db
-			inner join bluebin.DimBin dbh on db.FacilityID = dbh.BinFacility and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and db.BinQty <> dbh.BinQty and db.Num = 1
-		) as a
-where FacilityID = a.fid and LocationID = a.lid and ItemID = a.iid and LastUpdated = a.lu and BinQty <> a.Q
+Delete from bluebin.DimBinHistory where [Date] < convert(Date,getdate()-100)
 
 
-insert into bluebin.DimBinHistory
-select 
-db.FacilityID,
-db.LocationID,
-db.ItemID,
-convert(int,dbh.BinQty) as BinQty,
-getdate()
---into #BinChange
-from (
-		select Row_number()
-            OVER(Partition BY FacilityID,LocationID,ItemID
-				ORDER BY LastUpdated desc) as Num,
-			FacilityID,
-			LocationID,
-			ItemID,
-			BinQty,
-			LastUpdated
-		from
-		bluebin.DimBinHistory) db
-inner join bluebin.DimBin dbh on db.FacilityID = dbh.BinFacility and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and db.BinQty <> dbh.BinQty and db.Num = 1
+IF (select count(*) from bluebin.DimBinHistory) < 1
+BEGIN
+insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+select convert(Date,getdate()-2),BinKey,BinFacility,LocationID,ItemID,BinQty,BinUOM,BinSequence,BinQty,BinUOM,BinSequence from bluebin.DimBin
+
+insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+select convert(Date,getdate()-1),BinKey,BinFacility,LocationID,ItemID,BinQty,BinUOM,BinSequence,BinQty,BinUOM,BinSequence from bluebin.DimBin
+END
+
+if not exists (select * from bluebin.DimBinHistory where [Date] = convert(Date,getdate()-1))
+BEGIN
+
+insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+select convert(Date,getdate()-1),db.BinKey,db.BinFacility,db.LocationID,db.ItemID,convert(int,db.BinQty),db.BinUOM,db.BinSequence,ISNULL(dbh.BinQty,0),ISNULL(dbh.LastBinUOM,'N/A'),ISNULL(dbh.LastSequence,'N/A')
+from bluebin.DimBin db
+left join bluebin.DimBinHistory dbh on db.BinFacility = dbh.FacilityID and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and dbh.[Date] = convert(Date,getdate()-2)
+END
+
+
+--if exists (select * from bluebin.DimBinHistory where [Date] = convert(Date,getdate()))
+--BEGIN
+--delete from bluebin.DimBinHistory where [Date] = convert(Date,getdate())
+--END
+
+
+--insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+--select convert(Date,getdate()),db.BinKey,db.BinFacility,db.LocationID,db.ItemID,convert(int,db.BinQty),db.BinUOM,db.BinSequence,ISNULL(dbh.BinQty,0),ISNULL(dbh.LastBinUOM,'N/A'),ISNULL(dbh.LastSequence,'N/A')
+--from bluebin.DimBin db
+--left join bluebin.DimBinHistory dbh on db.BinFacility = dbh.FacilityID and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and dbh.[Date] = convert(Date,getdate()-1)
+
 
 GO
 UPDATE etl.JobSteps

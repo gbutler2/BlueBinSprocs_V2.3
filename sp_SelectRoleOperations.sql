@@ -4,7 +4,7 @@ GO
 
 --exec sp_SelectRoleOperations
 CREATE PROCEDURE sp_SelectRoleOperations
-@RoleName varchar(50)
+@Name varchar(50)
 
 --WITH ENCRYPTION
 AS
@@ -18,7 +18,7 @@ bbo.OpName
 from bluebin.BlueBinRoleOperations bbro
 inner join bluebin.BlueBinRoles bbr on bbro.RoleID = bbr.RoleID
 inner join bluebin.BlueBinOperations bbo on bbro.OpID = bbo.OpID
-where bbr.RoleName like '%' + @RoleName + '%'
+where bbr.RoleName like '%' + @Name + '%' or bbo.OpName like '%' + @Name + '%'
 order by bbr.RoleName,bbo.OpName
 
 END

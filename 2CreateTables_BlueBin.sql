@@ -401,11 +401,17 @@ if not exists (select * from sys.tables where name = 'DimBinHistory')
 BEGIN
 CREATE TABLE [bluebin].[DimBinHistory](
 	DimBinHistoryID INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	[Date] date,
+	BinKey int null,
 	[FacilityID] smallint not null,
 	[LocationID] char(5) not null,
 	[ItemID] char(32) NOT NULL,
 	BinQty int not null,
-	LastUpdated date
+	LastBinQty int null,
+	Sequence varchar(7) null,
+	LastSequence varchar(7) null,
+	BinUOM varchar(4) null,
+	LastBinUOM varchar(4)
 
 )
 

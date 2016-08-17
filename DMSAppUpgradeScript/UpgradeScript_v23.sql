@@ -245,28 +245,125 @@ ALTER TABLE bluebin.BlueBinUser ALTER COLUMN AssignToQCN int not null
 --END MAJOR QCN CHANGE
 --*******************************************************************************************************************************************
 --*******************************************************************************************************************************************
+
+
 */
+
+--*******************************************************************************************************************************************
+--*******************************************************************************************************************************************
+/*********************************************
+ Adding New HuddleBoard Functionality for Multiple v2.3
+*********************************************/
+--*******************************************************************************************************************************************
+--*******************************************************************************************************************************************
+
+--select * from bluebin.Config where ConfigName like '%Huddle%'
+if not exists (select * from bluebin.Config where ConfigName = 'MENU-Dashboard-HuddleBoard2')
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,Description) VALUES
+
+('MENU-Dashboard-HuddleBoard2','0','1',getdate(),'DMS','HuddleBoard2 Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)'),
+('MENU-Dashboard-HuddleBoard3','0','1',getdate(),'DMS','HuddleBoard3 Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)'),
+('MENU-Dashboard-HuddleBoard4','0','1',getdate(),'DMS','HuddleBoard4 Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)'),
+('MENU-Dashboard-HuddleBoard5','0','1',getdate(),'DMS','HuddleBoard5 Functionality is available for this client. Default=0 (Boolean 0 is No, 1 is Yes)'),
+
+('HuddleBoardTitle','Digital Huddle Board - Main','1',getdate(),'DMS','HuddleBoard Title to Show in the Page Title and Menu Dropdowns'),
+('HuddleBoard2Title','Digital Huddle Board - Second','1',getdate(),'DMS','HuddleBoard2 Title to Show in the Page Title and Menu Dropdowns'),
+('HuddleBoard3Title','Digital Huddle Board - Third','1',getdate(),'DMS','HuddleBoard3 Title to Show in the Page Title and Menu Dropdowns'),
+('HuddleBoard4Title','Digital Huddle Board - Fourth','1',getdate(),'DMS','HuddleBoard4 Title to Show in the Page Title and Menu Dropdowns'),
+('HuddleBoard5Title','Digital Huddle Board - Fifth','1',getdate(),'DMS','HuddleBoard5 Title to Show in the Page Title and Menu Dropdowns'),
+
+('HuddleBoardWorkbook','HB-'+(select DB_NAME()),'1',getdate(),'Tableau','Name of HuddleBoard workbook in Tableau'),
+('HuddleBoard2Workbook','HB2-'+(select DB_NAME()),'1',getdate(),'Tableau','Name of HuddleBoard2 workbook in Tableau'),
+('HuddleBoard3Workbook','HB3-'+(select DB_NAME()),'1',getdate(),'Tableau','Name of HuddleBoard3 workbook in Tableau'),
+('HuddleBoard4Workbook','HB4-'+(select DB_NAME()),'1',getdate(),'Tableau','Name of HuddleBoard4 workbook in Tableau'),
+('HuddleBoard5Workbook','HB5-'+(select DB_NAME()),'1',getdate(),'Tableau','Name of HuddleBoard5 workbook in Tableau')
+END
+
+--select * from bluebin.BlueBinOperations
+--select * from bluebin.BlueBinRoleOperations
+
+if not exists (select * from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard2')
+BEGIN
+insert into bluebin.BlueBinOperations (OpName,Description) VALUES
+('MENU-Dashboard-HuddleBoard2','Give User ability to see the Huddle Board2'),
+('MENU-Dashboard-HuddleBoard3','Give User ability to see the Huddle Board3'),
+('MENU-Dashboard-HuddleBoard4','Give User ability to see the Huddle Board4'),
+('MENU-Dashboard-HuddleBoard5','Give User ability to see the Huddle Board5')
+END
+
+if not exists (select * from bluebin.BlueBinRoleOperations where OpID in (select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard2'))
+BEGIN
+insert into bluebin.BlueBinRoleOperations
+select RoleID,(select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard2')
+from bluebin.BlueBinRoles where RoleID in (select RoleID from bluebin.BlueBinRoleOperations where OpID in (select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard'))
+END
+
+if not exists (select * from bluebin.BlueBinRoleOperations where OpID in (select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard3'))
+BEGIN
+insert into bluebin.BlueBinRoleOperations
+select RoleID,(select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard3')
+from bluebin.BlueBinRoles where RoleID in (select RoleID from bluebin.BlueBinRoleOperations where OpID in (select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard'))
+END
+
+if not exists (select * from bluebin.BlueBinRoleOperations where OpID in (select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard4'))
+BEGIN
+insert into bluebin.BlueBinRoleOperations
+select RoleID,(select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard4')
+from bluebin.BlueBinRoles where RoleID in (select RoleID from bluebin.BlueBinRoleOperations where OpID in (select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard'))
+END
+
+if not exists (select * from bluebin.BlueBinRoleOperations where OpID in (select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard5'))
+BEGIN
+insert into bluebin.BlueBinRoleOperations
+select RoleID,(select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard5')
+from bluebin.BlueBinRoles where RoleID in (select RoleID from bluebin.BlueBinRoleOperations where OpID in (select OpID from bluebin.BlueBinOperations where OpName = 'MENU-Dashboard-HuddleBoard'))
+END
+
+--*******************************************************************************************************************************************
+--*******************************************************************************************************************************************
+/*********************************************
+END
+*********************************************/
+--*******************************************************************************************************************************************
+--*******************************************************************************************************************************************
+if not exists(select * from sys.columns where name = 'BinKey' and object_id = (select object_id from sys.tables where name = 'DimBinHistory'))
+BEGIN
+ALTER TABLE bluebin.DimBinHistory ADD BinKey int
+ALTER TABLE bluebin.DimBinHistory ADD [Sequence] varchar(7)
+ALTER TABLE bluebin.DimBinHistory ADD [BinUOM] varchar(4) 
+ALTER TABLE bluebin.DimBinHistory ADD [LastBinUOM] varchar(4)  
+ALTER TABLE bluebin.DimBinHistory ADD [Date] date
+ALTER TABLE bluebin.DimBinHistory ADD [LastSequence] varchar(7)
+ALTER TABLE bluebin.DimBinHistory ADD [LastBinQty] int
+ALTER TABLE bluebin.DimBinHistory DROP COLUMN LastUpdated
+;
+truncate table bluebin.etl_DimBinHistory
+
+END
+
+
 if not exists(select * from sys.columns where name = 'Details' and object_id = (select object_id from sys.tables where name = 'ConesDeployed'))
 BEGIN
 ALTER TABLE bluebin.ConesDeployed ADD Details varchar (255)
 END
 GO
-if not exists(select * from sys.columns where name = 'SubProduct' and object_id = (select object_id from sys.tables where name = 'ScanLine'))
+if not exists(select * from sys.columns where name = 'SubProduct' and object_id = (select object_id from sys.tables where name = 'ConesDeployed'))
 BEGIN
 ALTER TABLE bluebin.ConesDeployed ADD SubProduct varchar (3)
 END
 GO
-if not exists(select * from sys.columns where name = 'ExpectedDelivery' and object_id = (select object_id from sys.tables where name = 'ScanLine'))
+if not exists(select * from sys.columns where name = 'ExpectedDelivery' and object_id = (select object_id from sys.tables where name = 'ConesDeployed'))
 BEGIN
 update bluebin.ConesDeployed set SubProduct = 'No'
 END
 GO
-if not exists(select * from sys.columns where name = 'ExpectedDelivery' and object_id = (select object_id from sys.tables where name = 'ScanLine'))
+if not exists(select * from sys.columns where name = 'ExpectedDelivery' and object_id = (select object_id from sys.tables where name = 'ConesDeployed'))
 BEGIN
 ALTER TABLE bluebin.ConesDeployed ADD ExpectedDelivery datetime
 END
 GO
-if exists(select * from sys.columns where name = 'SubProduct' and object_id = (select object_id from sys.tables where name = 'ScanLine'))
+if exists(select * from sys.columns where name = 'SubProduct' and object_id = (select object_id from sys.tables where name = 'ConesDeployed'))
 BEGIN
 ALTER TABLE bluebin.ConesDeployed ALTER COLUMN SubProduct varchar (3) not null
 END
@@ -276,7 +373,7 @@ if not exists(select * from sys.columns where name = 'Bin' and object_id = (sele
 BEGIN
 ALTER TABLE scan.ScanLine ADD Bin varchar (2)
 END
-
+GO
 if not exists(select * from sys.columns where name = 'ScanType' and object_id = (select object_id from sys.tables where name = 'ScanBatch'))
 BEGIN
 ALTER TABLE scan.ScanBatch ADD ScanType varchar (25)
@@ -479,7 +576,9 @@ insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType
 ('OP-Warehouse Detail','1',1,getdate(),'Reports','Setting for whether to display the Warehouse Size Report'),
 ('OP-Warehouse Volume','1',1,getdate(),'Reports','Setting for whether to display the Warehouse Value Report'),
 ('OP-Huddle Board','1',1,getdate(),'Reports','Setting for whether to display the Huddle Board Report'),
+('OP-Cones Dashboard','1',1,getdate(),'Reports','Setting for whether to display the Cones Deploy DB'),
 ('OP-QCN Dashboard','1',1,getdate(),'Reports','Setting for whether to display the QCN DB'),
+('OP-QCN Detail','1',1,getdate(),'Reports','Setting for whether to display the QCN Detail Report'),
 ('OP-Gemba Dashboard','1',1,getdate(),'Reports','Setting for whether to display the Gemba DB')
 END
 
@@ -778,6 +877,29 @@ CREATE TABLE [bluebin].[BlueBinParMaster](
 	
 )
 
+
+END
+GO
+
+--*****************************************************
+--**************************NEWTABLE**********************
+if not exists (select * from sys.tables where name = 'DimBinHistory')
+BEGIN
+CREATE TABLE [bluebin].[DimBinHistory](
+	DimBinHistoryID INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
+	[Date] date,
+	BinKey int null,
+	[FacilityID] smallint not null,
+	[LocationID] char(5) not null,
+	[ItemID] char(32) NOT NULL,
+	BinQty int not null,
+	LastBinQty int null,
+	Sequence varchar(7) null,
+	LastSequence varchar(7) null,
+	BinUOM varchar(4) null,
+	LastBinUOM varchar(4)
+
+)
 
 END
 GO
@@ -1929,6 +2051,7 @@ where bbu.Active = 1
   and
   ([LastName] like '%' + @Name + '%' 
 	OR [FirstName] like '%' + @Name + '%' )
+	or bbo.OpName like '%' + @Name + '%' 
 order by bbu.LastName + ', ' + FirstName,bbo.OpName
 
 END
@@ -1943,9 +2066,9 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectRoleOper
 drop procedure sp_SelectRoleOperations
 GO
 
---exec sp_SelectRoleOperations
+--exec sp_SelectRoleOperations ''
 CREATE PROCEDURE sp_SelectRoleOperations
-@RoleName varchar(50)
+@Name varchar(50)
 
 --WITH ENCRYPTION
 AS
@@ -1959,7 +2082,7 @@ bbo.OpName
 from bluebin.BlueBinRoleOperations bbro
 inner join bluebin.BlueBinRoles bbr on bbro.RoleID = bbr.RoleID
 inner join bluebin.BlueBinOperations bbo on bbro.OpID = bbo.OpID
-where bbr.RoleName like '%' + @RoleName + '%'
+where bbr.RoleName like '%' + @Name + '%'  or bbo.OpName like '%' + @Name + '%'
 order by bbr.RoleName,bbo.OpName
 
 END
@@ -6566,6 +6689,36 @@ GO
 
 --*****************************************************
 --**************************SPROC**********************
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectUsersShort') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_SelectUsersShort
+GO
+
+--exec sp_SelectUsersShort
+
+CREATE PROCEDURE sp_SelectUsersShort
+
+
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+	SELECT 
+	[BlueBinUserID]
+      ,[UserLogin]
+      ,[FirstName]
+      ,[LastName]
+      ,[MiddleName]
+      ,LastName + ', ' + FirstName as Name
+  FROM [bluebin].[BlueBinUser] bbu
+  where UserLogin <> ''
+  and Active = 1
+  order by LastName,[FirstName]
+
+END
+GO
+grant exec on sp_SelectUsersShort to appusers
+GO
 
 --*****************************************************
 --**************************SPROC**********************
@@ -7032,6 +7185,66 @@ GO
 grant exec on ssp_CleanDB to public
 GO
 
+--*****************************************************
+--**************************SPROC**********************
+
+if exists (select * from dbo.sysobjects where id = object_id(N'ssp_DBInfo') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure ssp_DBInfo
+GO
+
+--exec ssp_DBInfo 'dbo'
+
+CREATE PROCEDURE ssp_DBInfo
+@schema varchar(20)
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+select 
+ss.name as [Schema]
+,st.name as [Table]
+,ddps.row_count
+
+from sys.tables st
+	inner join sys.dm_db_partition_stats ddps on st.object_id = ddps.object_id
+	left outer join sys.schemas ss on st.schema_id = ss.schema_id
+where ss.name like '%' + @schema + '%'
+order by ss.name,st.name
+
+--Schema, Table, Column query
+select 
+ss.name as [Schema]
+,st.name as [Table]
+,sc.name as [Column]
+,stt.name as [Type]
+,case
+	when sc.is_identity = 1 then 'PK'
+	else ''
+	end as 'PK'
+,sc.max_length
+,case
+	when sc.is_nullable = 1 then ''
+	when sc.is_nullable = 0 then 'NOT NULL'
+end as [Null]
+
+from sys.tables st
+	left outer join sys.schemas ss on st.schema_id = ss.schema_id
+	inner join sys.columns sc on st.object_id = sc.object_id
+	inner join sys.types stt on sc.system_type_id = stt.system_type_id
+
+where ss.name like '%' + @schema + '%' --and (sc.Name like '%DATE%' or sc.Name like '%DT%')
+
+order by ss.name,st.name,sc.column_id
+
+
+END
+GO
+grant exec on ssp_DBInfo to public
+GO
+
+
 
 Print 'SSP Sproc Add/Updates Complete'
 
@@ -7268,7 +7481,7 @@ Print 'Job Updates Complete'
 --Version Update
 --*************************************************************************************************************************************************
 
-declare @version varchar(50) = '2.3.20160727' --Update Version Number here
+declare @version varchar(50) = '2.3.20160812' --Update Version Number here
 
 
 if not exists (select * from bluebin.Config where ConfigName = 'Version')

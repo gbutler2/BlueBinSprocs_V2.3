@@ -2987,64 +2987,43 @@ BEGIN
 
 
 select 
-DATEPART(WEEK,a.[Date]) as [Week]
-,a.[Date]
-,a.[Date]-1 as Yesterday
-,a.FacilityID
+DATEPART(WEEK,dbh.[Date]) as [Week]
+,dbh.[Date]
+--,dbh.[Date]-1 as Yesterday
+,dbh.FacilityID
 ,df.FacilityName
-,a.LocationID
+,dbh.LocationID
 ,dl.LocationName
-,a.ItemID
+,dbh.ItemID
 ,di.ItemDescription
-,convert(int,a.BinQty) as BinQty
-,convert(int,dbh2.BinQty) as YestBinQty
-,a.BinUOM
+,dbh.BinQty as BinQty
+,dbh.LastBinQty as YestBinQty
+,dbh.BinUOM
+,dbh.LastBinUOM as YestBinUOM
+,dbh.Sequence
+,dbh.LastSequence as YestSequence
 ,a.OrderQty
 ,a.OrderUOM
-,case when dbh2.BinQty is not null then 1 else 0 end as BinChange
+,case when (dbh.BinQty <> dbh.LastBinQty or dbh.Sequence <> dbh.LastSequence) and dbh.LastBinQty > 0 then 1 else 0 end as BinChange
 ,case when a.OrderQty is not null and a.OrderQty <> a.BinQty and a.OrderUOM = a.BinUOM then 1 else 0 end as BinOrderChange
 ,a.BinCurrentStatus
 
-from tableau.Kanban a
+from bluebin.DimBinHistory dbh
+inner join tableau.Kanban a on dbh.FacilityID = a.FacilityID and dbh.LocationID = a.LocationID and dbh.ItemID = a.ItemID and dbh.[Date] = a.[Date]
 inner join bluebin.DimFacility df on a.FacilityID = df.FacilityID
 inner join bluebin.DimLocation dl on a.LocationID = dl.LocationID
 inner join bluebin.DimItem di on a.ItemID = di.ItemID
 
-left join 
-	(select FacilityID, LocationID,ItemID,BinQty,LastUpdated from
-		(select ROW_NUMBER() 
-					OVER(Partition by d.FacilityID,d.LocationID,d.ItemID order by d.LastUpdated desc) as Num,
-					d.FacilityID, d.LocationID,d.ItemID,d.BinQty,d.LastUpdated 
-					from bluebin.DimBinHistory d 
-						 inner join (select FacilityID, LocationID,ItemID,count(*) as Ct from bluebin.DimBinHistory group by FacilityID, LocationID,ItemID) changed on d.FacilityID = changed.FacilityID and d.LocationID = changed.LocationID and d.ItemID = changed.ItemID and changed.Ct > 1
-						group by d.FacilityID, d.LocationID,d.ItemID,d.BinQty,d.LastUpdated) as a where Num = 1) dbh on a.FacilityID = dbh.FacilityID and a.LocationID = dbh.LocationID and a.ItemID = dbh.ItemID and convert(Date,a.[Date]+1) = convert(date,(dbh.[LastUpdated])) 
-left join 
-	(select FacilityID, LocationID,ItemID,BinQty from
-		(select ROW_NUMBER() 
-					OVER(Partition by d2.FacilityID,d2.LocationID,d2.ItemID order by d2.LastUpdated desc) as Num,
-					d2.FacilityID, d2.LocationID,d2.ItemID,d2.BinQty,d2.LastUpdated 
-					from bluebin.DimBinHistory d2
-						 inner join (select FacilityID, LocationID,ItemID,count(*) as Ct from bluebin.DimBinHistory group by FacilityID, LocationID,ItemID) changed on d2.FacilityID = changed.FacilityID and d2.LocationID = changed.LocationID and d2.ItemID = changed.ItemID and changed.Ct > 1
-						group by d2.FacilityID, d2.LocationID,d2.ItemID,d2.BinQty,d2.LastUpdated) as a where Num = 2) dbh2 on dbh.FacilityID = dbh2.FacilityID and dbh.LocationID = dbh2.LocationID and dbh.ItemID = dbh2.ItemID 
 
-where a.[Date] >= getdate() -7 and ((a.OrderQty<>a.BinQty and a.OrderQty is not null) or dbh2.BinQty is not null)  and ScanHistseq > (select ConfigValue from bluebin.Config where ConfigName = 'ScanThreshold')
+where dbh.[Date] >= getdate() -7 
 --and a.LocationID = 'B7435' and a.ItemID = '30003' 
-order by FacilityID,LocationID,ItemID
+order by dbh.FacilityID,dbh.LocationID,dbh.ItemID
 
 
 END
 GO
 grant exec on tb_KanbansAdjusted to public
 GO
-
---select * from ITEMLOC where ITEM = '700' and LOCATION = 'B6183'
-
---select * from bluebin.DimBin where ItemID= '0008733' and LocationID= 'BB009'
---select * from bluebin.BlueBinParMaster  where ItemID= '700' and LocationID= 'B6183'
-
---update bluebin.BlueBinParMaster set BinQuantity = BinQuantity -5 where ItemID= '700' and LocationID= 'B6183'
-
---select * from etl.JobSteps
 
 --*********************************************************************************************
 --Tableau Sproc  These load data into the datasources for Tableau
@@ -3357,56 +3336,45 @@ AS
 
 
 /*
-select * from bluebin.DimBinHistory where LocationID = 'B6183' and ItemID = '700'
+select * from bluebin.DimBinHistory where LastSequence = 'N/A' order by FacilityID,LocationID,ItemID,Date
 select * from bluebin.DimBin where LocationID = 'B6183' and ItemID = '700'  
 select * from tableau.Kanban where LocationID = 'B6183' and ItemID = '700' and convert(Date,[Date]) = convert(Date,getdate()-1)
 update bluebin.DimBinHistory set LastUpdated = getdate() -3 where DimBinHistoryID = 6161
+truncate table bluebin.DimBinHistory
 */
-update bluebin.DimBinHistory set BinQty = a.Q
-from (
-		select 
-			db.FacilityID as fid,
-			db.LocationID as lid,
-			db.ItemID as iid,
-			convert(int,dbh.BinQty) as Q,
-			convert(Date,getdate()) as lu
-			--into #BinChange
-			from (
-					select Row_number()
-						OVER(Partition BY FacilityID,LocationID,ItemID
-							ORDER BY LastUpdated desc) as Num,
-						FacilityID,
-						LocationID,
-						ItemID,
-						BinQty,
-						LastUpdated
-					from
-					bluebin.DimBinHistory) db
-			inner join bluebin.DimBin dbh on db.FacilityID = dbh.BinFacility and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and db.BinQty <> dbh.BinQty and db.Num = 1
-		) as a
-where FacilityID = a.fid and LocationID = a.lid and ItemID = a.iid and LastUpdated = a.lu and BinQty <> a.Q
+Delete from bluebin.DimBinHistory where [Date] < convert(Date,getdate()-100)
 
 
-insert into bluebin.DimBinHistory
-select 
-db.FacilityID,
-db.LocationID,
-db.ItemID,
-convert(int,dbh.BinQty) as BinQty,
-getdate()
---into #BinChange
-from (
-		select Row_number()
-            OVER(Partition BY FacilityID,LocationID,ItemID
-				ORDER BY LastUpdated desc) as Num,
-			FacilityID,
-			LocationID,
-			ItemID,
-			BinQty,
-			LastUpdated
-		from
-		bluebin.DimBinHistory) db
-inner join bluebin.DimBin dbh on db.FacilityID = dbh.BinFacility and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and db.BinQty <> dbh.BinQty and db.Num = 1
+IF (select count(*) from bluebin.DimBinHistory) < 1
+BEGIN
+insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+select convert(Date,getdate()-2),BinKey,BinFacility,LocationID,ItemID,BinQty,BinUOM,BinSequence,BinQty,BinUOM,BinSequence from bluebin.DimBin
+
+insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+select convert(Date,getdate()-1),BinKey,BinFacility,LocationID,ItemID,BinQty,BinUOM,BinSequence,BinQty,BinUOM,BinSequence from bluebin.DimBin
+END
+
+if not exists (select * from bluebin.DimBinHistory where [Date] = convert(Date,getdate()-1))
+BEGIN
+
+insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+select convert(Date,getdate()-1),db.BinKey,db.BinFacility,db.LocationID,db.ItemID,convert(int,db.BinQty),db.BinUOM,db.BinSequence,ISNULL(dbh.BinQty,0),ISNULL(dbh.LastBinUOM,'N/A'),ISNULL(dbh.LastSequence,'N/A')
+from bluebin.DimBin db
+left join bluebin.DimBinHistory dbh on db.BinFacility = dbh.FacilityID and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and dbh.[Date] = convert(Date,getdate()-2)
+END
+
+
+--if exists (select * from bluebin.DimBinHistory where [Date] = convert(Date,getdate()))
+--BEGIN
+--delete from bluebin.DimBinHistory where [Date] = convert(Date,getdate())
+--END
+
+
+--insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
+--select convert(Date,getdate()),db.BinKey,db.BinFacility,db.LocationID,db.ItemID,convert(int,db.BinQty),db.BinUOM,db.BinSequence,ISNULL(dbh.BinQty,0),ISNULL(dbh.LastBinUOM,'N/A'),ISNULL(dbh.LastSequence,'N/A')
+--from bluebin.DimBin db
+--left join bluebin.DimBinHistory dbh on db.BinFacility = dbh.FacilityID and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and dbh.[Date] = convert(Date,getdate()-1)
+
 
 GO
 UPDATE etl.JobSteps
@@ -3416,8 +3384,6 @@ WHERE StepName = 'DimBinHistory'
 GO
 grant exec on etl_DimBinHistory to public
 GO
-
-
 --*********************************************************************************************
 --Tableau Sproc  These load data into the datasources for Tableau
 --*********************************************************************************************
@@ -3438,6 +3404,7 @@ SET NOCOUNT ON
 	SELECT 
 	cd.ConeDeployed,
 	cd.Deployed,
+	cd.ExpectedDelivery,
 	cd.ConeReturned,
 	cd.Returned,
 	df.FacilityID,
@@ -3447,6 +3414,7 @@ SET NOCOUNT ON
 	di.ItemID,
 	di.ItemDescription,
 	db.BinSequence,
+	cd.SubProduct,
 	other.LocationID as AllLocations
 	
 	FROM bluebin.[ConesDeployed] cd
@@ -3665,6 +3633,135 @@ GO
 grant exec on tb_HealthTrends to public
 GO
 
+
+
+
+--*********************************************************************************************
+--Tableau Sproc  These load data into the datasources for Tableau
+--*********************************************************************************************
+if exists (select * from dbo.sysobjects where id = object_id(N'tb_QCNTimeline') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure tb_QCNTimeline
+GO
+
+--select * from qcn.QCN
+--exec tb_QCNTimeline 
+CREATE PROCEDURE tb_QCNTimeline
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+--Main query off of the subs to pull the Date, Facility, Location then takes a running total of Opened/Closed and displays.
+select
+LastDay,
+[Date],
+WeekName,
+FacilityID,
+FacilityName,
+--LocationID,
+--LocationName,
+OpenedCt,
+ClosedCt,
+((SUM(OpenedCt) OVER (PARTITION BY FacilityID ORDER BY [Date] ROWS UNBOUNDED PRECEDING))-(SUM(ClosedCt) OVER (PARTITION BY FacilityID ORDER BY [Date] ROWS UNBOUNDED PRECEDING))) as RunningTotal
+	
+from
+	(select
+	LastDay,
+	[Date],
+	WeekName,
+	FacilityID,
+	FacilityName,
+	--LocationID,
+	--LocationName,
+	sum(OpenedCt) as OpenedCt,
+	sum(ClosedCt) as ClosedCt
+	from (
+		select 
+		 (DATEADD(dd, @@DATEFIRST - DATEPART(dw, dd.Date), dd.Date)) as LastDay,
+		 convert(varchar(4),datepart(yyyy,dd.Date))+right(('0'+convert(varchar(2),datepart(ww,dd.Date))),2)as [Date],
+		 convert(varchar(4),datepart(yyyy,dd.Date))+' W'+right(('0'+convert(varchar(2),datepart(ww,dd.Date))),2)+' '+
+		 left(DATENAME(Month,CONVERT(varchar(50), (DATEADD(dd, @@DATEFIRST - DATEPART(dw, dd.Date), dd.Date)-6), 101)),3)+' '+SUBSTRING(CONVERT(varchar(50), (DATEADD(dd, @@DATEFIRST - DATEPART(dw, dd.Date), dd.Date)-6), 101),4,2)
+				+'-'+
+					left(DATENAME(Month,CONVERT(varchar(50), (DATEADD(dd, @@DATEFIRST - DATEPART(dw, dd.Date), dd.Date)), 101)),3)+' '+SUBSTRING(CONVERT(varchar(50), (DATEADD(dd, @@DATEFIRST - DATEPART(dw, dd.Date), dd.Date)), 101),4,2) as WeekName,
+		dd.FacilityID,
+		dd.FacilityName,
+		dd.LocationID,
+		dd.LocationName,
+		ISNULL(aa.OpenedCt,0) as OpenedCt,
+		ISNULL(bb.ClosedCt,0) as ClosedCt
+
+		from (
+				--General query to populate a date for everyday for every Facility and Location
+				select dd.Date,df.FacilityID,df.FacilityName,'Multiple' as LocationID,'Multiple' as LocationName from bluebin.DimDate dd,bluebin.DimFacility df
+				UNION ALL
+				select dd.Date,df.FacilityID,df.FacilityName,dl.LocationID,LocationName from bluebin.DimDate dd,bluebin.DimFacility df
+				inner join bluebin.DimLocation dl on df.FacilityID = dl.LocationFacility and dl.BlueBinFlag = 1 
+				where Date < getdate() +1 and Date > = (select min(DateEntered)-1 from qcn.QCN where Active = 1)) dd
+			left join (
+				--Query to pull all Opened QCNs by Facility and Location
+				select 
+						[Date],
+						FacilityID,
+						LocationID,
+						OpenedCt
+						from (
+							select 
+							dd.Date,
+							q1.FacilityID,
+							q1.LocationID,
+							count(ISNULL(q1.DateEntered,0)) as OpenedCt
+							from bluebin.DimDate dd
+							left join qcn.QCN q1 on dd.Date = convert(date,q1.DateEntered,112) and q1.Active = 1
+							where q1.FacilityID is not null and dd.Date < getdate() +1 and dd.Date > = (select min(DateEntered)-1 from qcn.QCN where Active = 1)
+							group by dd.Date,q1.FacilityID,q1.LocationID
+					
+							 ) a
+							 --order by FacilityID,LocationID,Date
+							 ) aa on dd.Date = aa.Date and dd.FacilityID = aa.FacilityID and dd.LocationID = aa.LocationID
+			left join (
+				--Query to pull all Closed QCNs by Facility and Location
+				select 
+						[Date],
+						FacilityID,
+						LocationID,
+						ClosedCt
+						from (
+							select 
+							dd.Date,
+							q2.FacilityID,
+							q2.LocationID,
+					
+							count(ISNULL(q2.DateCompleted,0)) as ClosedCt
+							from bluebin.DimDate dd
+							left join qcn.QCN q2 on dd.Date = convert(date,q2.DateCompleted,112) and q2.Active = 1
+							where q2.FacilityID is not null and dd.Date < getdate() +1 and dd.Date > = (select min(DateCompleted)-1 from qcn.QCN where Active = 1)
+							group by dd.Date,q2.FacilityID,q2.LocationID
+					
+							 ) a
+							 --order by FacilityID,LocationID,Date
+							 ) bb on dd.Date = bb.Date  and dd.FacilityID = bb.FacilityID and dd.LocationID = bb.LocationID
+
+		where dd.Date < getdate() +1 and dd.Date > = (select min(DateEntered)-1 from qcn.QCN where Active = 1) and (ISNULL(OpenedCt,0) + ISNULL(ClosedCt,0)) > 0 
+		) b
+	group by 
+	LastDay,
+	[Date],
+	WeekName,
+	FacilityID,
+	FacilityName
+	--LocationID,
+	--LocationName
+	) c 
+order by FacilityID,Date desc
+
+
+
+
+END
+GO
+grant exec on tb_QCNTimeline to public
+GO
 
 
 

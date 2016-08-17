@@ -1,0 +1,50 @@
+
+    <%-- Add Operation --%>     
+    <asp:TableRow><asp:TableCell><asp:Label runat="server" id="hiddenUserOperations" Visible="False"><h3>User Operations</h3></asp:Label></asp:TableCell></asp:TableRow>
+    <asp:TableRow ID="AddUserOperationJT" runat="server" Width="250">
+        <asp:TableCell >
+          <asp:Table runat="server" CellPadding="1" CellSpacing="1">
+        <asp:TableRow Width="250" BackColor="#CCCCCC">
+          <asp:TableCell><asp:LinkButton ID="UserOperationsInsertB" runat="server" Text="Add Operation"  class="btn btn-primary btn-sm"></asp:LinkButton></asp:TableCell>
+          <asp:TableCell Width ="3"></asp:TableCell><asp:TableCell><asp:DropDownList runat="server" ID="NameUODDAdd" DataSourceID="NameDataSourceF" DataTextField="Name" DataValueField="BlueBinUserID" AppendDataBoundItems="False"></asp:DropDownList>
+                    <asp:SqlDataSource runat="server" ID="NameDataSourceF" ConnectionString='<%$ ConnectionStrings:Site_ConnectionString %>' SelectCommand="exec sp_SelectUsersShort"></asp:SqlDataSource></asp:TableCell>
+          <asp:TableCell Width ="3"></asp:TableCell><asp:TableCell><asp:DropDownList runat="server" ID="OpNameUODDAdd" DataSourceID="OpNameDataSourceF2" DataTextField="OpName" DataValueField="OpID" AppendDataBoundItems="False"></asp:DropDownList>
+                        <asp:SqlDataSource runat="server" ID="OpNameDataSourceF2" ConnectionString='<%$ ConnectionStrings:Site_ConnectionString %>' SelectCommand="exec sp_SelectOperations ''"></asp:SqlDataSource></asp:TableCell>
+          <asp:TableCell Width ="3"></asp:TableCell>
+        </asp:TableRow>
+        <asp:TableRow Height="10px"></asp:TableRow>
+          </asp:Table>
+
+        </asp:TableCell>
+    </asp:TableRow>
+	
+	
+	
+	    'AddRoleOperationJT.Visible = False
+        'AddOperationJT.Visible = False
+        'AddRoleJT.Visible = False
+        'AddUserOperationJT.Visible = False
+        'AddUserJT.Visible = False
+		
+		
+	Protected Sub UserOperationsInsertB_Click(sender As Object, e As EventArgs) Handles UserOperationsInsertB.Click
+
+        Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.ConnectionStrings("Site_ConnectionString").ConnectionString)
+        Dim ad As New SqlDataAdapter()
+        Dim cmd As New SqlCommand()
+        Dim txtName As String = NameUODDAdd.SelectedItem.Value
+        Dim txtOpName As String = OpNameUODDAdd.SelectedItem.Value
+        cmd.Connection = conn
+        cmd.CommandText = "exec sp_InsertUserOperations '" & txtName & "','" & txtOpName & "'"
+        conn.Open()
+        cmd.ExecuteNonQuery()
+        conn.Close()
+        GridViewUsers.DataBind()
+        GridViewRoles.DataBind()
+        GridViewOperations.DataBind()
+        GridViewRoleOperations.DataBind()
+        GridViewUserOperations.DataBind()
+
+        AddUserErrorLabel.Text = "User Operation Created"
+
+    End Sub
