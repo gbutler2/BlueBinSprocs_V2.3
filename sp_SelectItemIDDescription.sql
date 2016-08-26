@@ -17,7 +17,7 @@ DISTINCT rtrim([ItemID]) as ItemID,
 	+ ' - ' + 
 		COALESCE(ItemDescription,ItemClinicalDescription,'No Description') as ExtendedDescription 
 FROM bluebin.[DimItem]
-
+order by ItemID
 END
 GO
 grant exec on sp_SelectItemIDDescription to appusers

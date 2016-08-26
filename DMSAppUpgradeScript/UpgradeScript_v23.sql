@@ -186,9 +186,13 @@ END
 
 
 
---updating existing values
+--updating existing values  select * from qcn.QCN
 update qcn.QCN set QCNCID = 2
 
+if not exists(select * from sys.columns where name = 'ACTIVE_STATUS' and object_id = (select object_id from sys.tables where name = 'DimLocation'))
+BEGIN
+ALTER TABLE bluebin.DimLocation ADD ACTIVE_STATUS char(1)
+END
 update qcn.QCN set FacilityID = a.LocationFacility from (select distinct LocationID as L, LocationFacility from bluebin.DimLocation where BlueBinFlag = 1 and ACTIVE_STATUS = 'A') a where LocationID = a.L
 update qcn.QCN set DateRequested = DateEntered
 update qcn.QCN set UOM = 'EA'
@@ -235,8 +239,9 @@ ALTER TABLE qcn.QCN ALTER COLUMN QCNCID int not null
 ALTER TABLE qcn.QCN ALTER COLUMN FacilityID int not null
 ALTER TABLE qcn.QCN ALTER COLUMN DateRequested datetime not null
 ALTER TABLE qcn.QCN ALTER COLUMN LoggedUserID int not null
-ALTER TABLE bluebin.BlueBinUser ALTER COLUMN AssignToQCN int not null
+ALTER TABLE bluebin.BlueBinUser ALTER COLUMN AssignToQCN int not nullBB
 
+select * from qcn.QCN
 
 
 
@@ -338,7 +343,7 @@ ALTER TABLE bluebin.DimBinHistory ADD [LastSequence] varchar(7)
 ALTER TABLE bluebin.DimBinHistory ADD [LastBinQty] int
 ALTER TABLE bluebin.DimBinHistory DROP COLUMN LastUpdated
 ;
-truncate table bluebin.etl_DimBinHistory
+truncate table bluebin.DimBinHistory
 
 END
 
@@ -495,8 +500,8 @@ GO
 
 if not exists (select * from bluebin.BlueBinOperations where [OpName] like 'MENU%')
 BEGIN
-insert into bluebin.BlueBinOperations select 'MENU-Cones','Give User ability to see the Cones Module'
 insert into bluebin.BlueBinOperations select 'MENU-Cones-EDIT','Give User ability to check out and in Cones'
+insert into bluebin.BlueBinOperations select 'MENU-Cones','Give User ability to see the Cones Module'
 insert into bluebin.BlueBinOperations select 'MENU-Dashboard','Give User ability to see the Dashboard Menu'
 insert into bluebin.BlueBinOperations select 'MENU-QCN','Give User ability to see the QCN Menu'
 insert into bluebin.BlueBinOperations select 'MENU-Gemba','Give User ability to see the Gemba Menu'
@@ -531,6 +536,13 @@ if not exists(select * from bluebin.Config where ConfigName = 'AutoExtractTraySc
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
 select 'AutoExtractTrayScans','0',1,getdate(),'Interface','Automaticaly create an extract for Scans that originate from the RFID Tray.  Default to No'
+END
+GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'SingleCompany')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'SingleCompany','0',1,getdate(),'DMS','Tableau Setting - Will limit the return of rows to one company for ERPs. Default=0 (Boolean 0 is No, 1 is Yes)'
 END
 GO
 
@@ -586,7 +598,7 @@ if not exists(select * from bluebin.Config where ConfigType = 'Reports' and Conf
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description]) VALUES
 ('Src-Buyer Performance','1',1,getdate(),'Reports','Setting for whether to display the Buyer Performance DB'),
-('Src-Specials Performance','1',1,getdate(),'Reports','Setting for whether to display the Specials DB'),
+('Src-Special Performance','1',1,getdate(),'Reports','Setting for whether to display the Specials DB'),
 ('Src-Supplier Performance','1',1,getdate(),'Reports','Setting for whether to display the Supplier Performance DB'),
 ('Src-Cost Impact Calculator','1',1,getdate(),'Reports','Setting for whether to display the Item Cost Impact DB'),
 ('Src-Open PO Report','1',1,getdate(),'Reports','Setting for whether to display the Open PO Report'),
@@ -746,7 +758,12 @@ insert into bluebin.Config (ConfigName,ConfigValue,ConfigType,Active,LastUpdated
 END
 GO
 
-
+if not exists(select * from bluebin.Config where ConfigName = 'ReportDateEnd')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'ReportDateEnd','',1,getdate(),'Tableau','Set to Current if you want to capture scans from today as well.  Default is blank'
+END
+GO
 
 
 Print 'Table Updates Complete'
@@ -2854,53 +2871,6 @@ GO
 grant exec on sp_SelectScanLines to public
 GO
 
---*****************************************************
---**************************SPROC**********************
-
-if exists (select * from dbo.sysobjects where id = object_id(N'tb_ItemLocator') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-drop procedure tb_ItemLocator
-GO
-
---exec tb_ItemLocator
-
-CREATE PROCEDURE tb_ItemLocator
-
---WITH ENCRYPTION
-AS
-BEGIN
-SET NOCOUNT ON
-SELECT 
-	a.ITEM as LawsonItemNumber,
-	ISNULL(c.MANUF_NBR,'N/A') as ItemManufacturerNumber,
-	ISNULL(b.ClinicalDescription,'*NEEDS*') as ClinicalDescription,
-	a.LOCATION as LocationCode,
-	a.NAME as LocationName,
-	a.Cart,
-	a.Row,
-	a.Position
-FROM 
-(SELECT 
-	ITEM,
-	LOCATION,
-	b.NAME,
-	LEFT(PREFER_BIN, 1) as Cart,
-	SUBSTRING(PREFER_BIN, 2,1) as Row,
-	SUBSTRING(PREFER_BIN, 3,2) as Position	
-FROM ITEMLOC a INNER JOIN RQLOC b ON a.LOCATION = b.REQ_LOCATION 
-WHERE LEFT(REQ_LOCATION, 2) IN (SELECT [ConfigValue] FROM   [bluebin].[Config] WHERE  [ConfigName] = 'REQ_LOCATION' AND Active = 1)) a
-LEFT JOIN 
-(SELECT 
-	ITEM, 
-	USER_FIELD3 as ClinicalDescription
-FROM ITEMLOC 
-WHERE LOCATION IN (SELECT [ConfigValue] FROM [bluebin].[Config] WHERE  [ConfigName] = 'LOCATION' AND Active = 1) AND LEN(LTRIM(USER_FIELD3)) > 0) b
-ON a.ITEM = b.ITEM
-left join ITEMMAST c on a.ITEM = c.ITEM
-
-END
-GO
-grant exec on tb_ItemLocator to public
-GO
 
 
 --*****************************************************
@@ -3911,7 +3881,7 @@ SET NOCOUNT ON
 	
 	WHERE 
 		Title in (Select ConfigValue from bluebin.Config where ConfigName = 'GembaShadowTitle')
-
+		order by 1
 END
 GO
 grant exec on sp_SelectGembaShadow to appusers
@@ -3939,10 +3909,12 @@ LocationID,
 case when LocationID = LocationName then LocationID else LocationID + ' - ' + [LocationName] end as LocationName 
 
 FROM [bluebin].[DimLocation] where BlueBinFlag = 1
+order by LocationID
 END
 GO
 grant exec on sp_SelectLocation to appusers
 GO
+
 
 
 --*****************************************************
@@ -4164,12 +4136,12 @@ SET NOCOUNT ON
 		LastUpdated 
 		
 	FROM qcn.[QCNStatus]
+	order by Status
 
 END
 GO
 grant exec on sp_SelectQCNStatus to appusers
 GO
-
 
 --*****************************************************
 --**************************SPROC**********************
@@ -5321,16 +5293,16 @@ select
     df.FacilityName as FacilityName
 	from qcn.QCN q
 	left join [bluebin].[DimFacility] df on q.FacilityID = df.FacilityID 
-
+	order by df.FacilityName
 END
 GO
 grant exec on sp_SelectQCNFacility to appusers
 GO
 
 
+
 --*****************************************************
 --**************************SPROC**********************
-
 
 
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectQCNLocation') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
@@ -5354,12 +5326,11 @@ select
 					else dl.LocationID + ' - ' + dl.[LocationName] end end as LocationName
 	from qcn.QCN q
 	left join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
-
+	order by LocationID
 END
 GO
 grant exec on sp_SelectQCNLocation to appusers
 GO
-
 
 
 
@@ -5471,6 +5442,7 @@ GO
 --*****************************************************
 --**************************SPROC**********************
 
+
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectFacilities') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_SelectFacilities
 GO
@@ -5488,13 +5460,12 @@ SELECT DISTINCT rtrim(df.[FacilityID]) as FacilityID,df.[FacilityName]
 FROM bluebin.[DimFacility] df
 
 inner join bluebin.DimLocation dl on df.FacilityID = dl.LocationFacility and dl.BlueBinFlag = 1
-order by 1 desc
+order by df.[FacilityName] asc
 
 END 
 GO
 grant exec on sp_SelectFacilities to public
 GO
-
 --*****************************************************
 --**************************SPROC**********************
 
@@ -6241,12 +6212,11 @@ DISTINCT rtrim([ItemID]) as ItemID,
 	+ ' - ' + 
 		COALESCE(ItemDescription,ItemClinicalDescription,'No Description') as ExtendedDescription 
 FROM bluebin.[DimItem]
-
+order by ItemID
 END
 GO
 grant exec on sp_SelectItemIDDescription to appusers
 GO
-
 
 --*****************************************************
 --**************************SPROC**********************
@@ -6744,7 +6714,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'ssp_TableSize') a
 drop procedure ssp_TableSize
 GO
 
---exec ssp_TableSize 'dbo'
+--exec ssp_TableSize ''
 
 CREATE PROCEDURE ssp_TableSize
 @schema varchar(20)
@@ -6754,74 +6724,18 @@ AS
 BEGIN
 SET NOCOUNT ON
 
-/*
+--Table Rowcount Query
 select 
-'Insert into @Count select '''+ss.name+''','''+st.name+''', count(*) from ' + ss.name + '.' + st.name
+ss.name as [Schema]
+,st.name as [Table]
+,ddps.row_count
+
 from sys.tables st
-inner join sys.schemas ss on st.schema_id = ss.schema_id
-where ss.name in ('tableau','dbo','bluebin')
-order by st.name
-*/
-declare @Count Table ([Schema] varchar(50),TableName varchar(100),[Count] int)
---insert results of query here
-Insert into @Count select 'dbo','APCOMPANY', count(*) from dbo.APCOMPANY
-Insert into @Count select 'dbo','APVENMAST', count(*) from dbo.APVENMAST
-Insert into @Count select 'bluebin','BlueBinFacility', count(*) from bluebin.BlueBinFacility
-Insert into @Count select 'bluebin','BlueBinOperations', count(*) from bluebin.BlueBinOperations
-Insert into @Count select 'bluebin','BlueBinParMaster', count(*) from bluebin.BlueBinParMaster
-Insert into @Count select 'bluebin','BlueBinResource', count(*) from bluebin.BlueBinResource
-Insert into @Count select 'bluebin','BlueBinRoleOperations', count(*) from bluebin.BlueBinRoleOperations
-Insert into @Count select 'bluebin','BlueBinRoles', count(*) from bluebin.BlueBinRoles
-Insert into @Count select 'bluebin','BlueBinUser', count(*) from bluebin.BlueBinUser
-Insert into @Count select 'bluebin','BlueBinUserOperations', count(*) from bluebin.BlueBinUserOperations
-Insert into @Count select 'dbo','BUYER', count(*) from dbo.BUYER
-Insert into @Count select 'bluebin','ConesDeployed', count(*) from bluebin.ConesDeployed
-Insert into @Count select 'bluebin','Config', count(*) from bluebin.Config
-Insert into @Count select 'tableau','Contracts', count(*) from tableau.Contracts
-Insert into @Count select 'bluebin','DimBin', count(*) from bluebin.DimBin
-Insert into @Count select 'bluebin','DimBinHistory', count(*) from bluebin.DimBinHistory
-Insert into @Count select 'bluebin','DimBinStatus', count(*) from bluebin.DimBinStatus
-Insert into @Count select 'bluebin','DimDate', count(*) from bluebin.DimDate
-Insert into @Count select 'bluebin','DimFacility', count(*) from bluebin.DimFacility
-Insert into @Count select 'bluebin','DimItem', count(*) from bluebin.DimItem
-Insert into @Count select 'bluebin','DimLocation', count(*) from bluebin.DimLocation
-Insert into @Count select 'bluebin','DimSnapshotDate', count(*) from bluebin.DimSnapshotDate
-Insert into @Count select 'bluebin','DimWarehouseItem', count(*) from bluebin.DimWarehouseItem
-Insert into @Count select 'bluebin','Document', count(*) from bluebin.Document
-Insert into @Count select 'bluebin','FactBinSnapshot', count(*) from bluebin.FactBinSnapshot
-Insert into @Count select 'bluebin','FactIssue', count(*) from bluebin.FactIssue
-Insert into @Count select 'bluebin','FactScan', count(*) from bluebin.FactScan
-Insert into @Count select 'bluebin','FactWarehouseSnapshot', count(*) from bluebin.FactWarehouseSnapshot
-Insert into @Count select 'dbo','GLCHARTDTL', count(*) from dbo.GLCHARTDTL
-Insert into @Count select 'dbo','GLNAMES', count(*) from dbo.GLNAMES
-Insert into @Count select 'dbo','GLTRANS', count(*) from dbo.GLTRANS
-Insert into @Count select 'dbo','ICCATEGORY', count(*) from dbo.ICCATEGORY
-Insert into @Count select 'dbo','ICLOCATION', count(*) from dbo.ICLOCATION
-Insert into @Count select 'dbo','ICMANFCODE', count(*) from dbo.ICMANFCODE
-Insert into @Count select 'dbo','ICTRANS', count(*) from dbo.ICTRANS
-Insert into @Count select 'bluebin','Image', count(*) from bluebin.Image
-Insert into @Count select 'dbo','ITEMLOC', count(*) from dbo.ITEMLOC
-Insert into @Count select 'dbo','ITEMMAST', count(*) from dbo.ITEMMAST
-Insert into @Count select 'dbo','ITEMSRC', count(*) from dbo.ITEMSRC
-Insert into @Count select 'tableau','Kanban', count(*) from tableau.Kanban
-Insert into @Count select 'dbo','MAINVDTL', count(*) from dbo.MAINVDTL
-Insert into @Count select 'dbo','MAINVMSG', count(*) from dbo.MAINVMSG
-Insert into @Count select 'bluebin','MasterLog', count(*) from bluebin.MasterLog
-Insert into @Count select 'dbo','MMDIST', count(*) from dbo.MMDIST
-Insert into @Count select 'dbo','POCODE', count(*) from dbo.POCODE
-Insert into @Count select 'dbo','POLINE', count(*) from dbo.POLINE
-Insert into @Count select 'dbo','POLINESRC', count(*) from dbo.POLINESRC
-Insert into @Count select 'dbo','PORECLINE', count(*) from dbo.PORECLINE
-Insert into @Count select 'dbo','POVAGRMTLN', count(*) from dbo.POVAGRMTLN
-Insert into @Count select 'dbo','PURCHORDER', count(*) from dbo.PURCHORDER
-Insert into @Count select 'dbo','REQHEADER', count(*) from dbo.REQHEADER
-Insert into @Count select 'dbo','REQLINE', count(*) from dbo.REQLINE
-Insert into @Count select 'dbo','REQUESTER', count(*) from dbo.REQUESTER
-Insert into @Count select 'dbo','RQLOC', count(*) from dbo.RQLOC
-Insert into @Count select 'tableau','Sourcing', count(*) from tableau.Sourcing
-Insert into @Count select 'bluebin','Training', count(*) from bluebin.Training
-Insert into @Count select 'bluebin','TrainingModule', count(*) from bluebin.TrainingModule--End
-select * from @Count  where [Schema] like '%' + @schema + '%' order by 1,2 asc
+	inner join sys.dm_db_partition_stats ddps on st.object_id = ddps.object_id
+	left outer join sys.schemas ss on st.schema_id = ss.schema_id
+	where ss.name like '%' + @schema + '%'
+order by ss.name,st.name
+
 
 END
 GO
@@ -7014,44 +6928,149 @@ drop procedure sp_CleanLawsonTables
 GO
 
 --exec sp_CleanLawsonTables
+
 CREATE PROCEDURE sp_CleanLawsonTables
-
-
 --WITH ENCRYPTION
 AS
 BEGIN
-SET NOCOUNT ON
+
+if exists (select * from sys.tables where name = 'APCOMPANY')
+BEGIN
 truncate table dbo.APCOMPANY
+END
+
+if exists (select * from sys.tables where name = 'APVENMAST')
+BEGIN
 truncate table dbo.APVENMAST
+END
+
+if exists (select * from sys.tables where name = 'BUYER')
+BEGIN
 truncate table dbo.BUYER
+END
+
+if exists (select * from sys.tables where name = 'GLCHARTDTL')
+BEGIN
 truncate table dbo.GLCHARTDTL
+END
+
+if exists (select * from sys.tables where name = 'GLNAMES')
+BEGIN
 truncate table dbo.GLNAMES
+END
+
+if exists (select * from sys.tables where name = 'GLTRANS')
+BEGIN
 truncate table dbo.GLTRANS
+END
+
+if exists (select * from sys.tables where name = 'ICCATEGORY')
+BEGIN
 truncate table dbo.ICCATEGORY
+END
+
+if exists (select * from sys.tables where name = 'ICMANFCODE')
+BEGIN
 truncate table dbo.ICMANFCODE
+END
+
+if exists (select * from sys.tables where name = 'ICLOCATION')
+BEGIN
 truncate table dbo.ICLOCATION
+END
+
+if exists (select * from sys.tables where name = 'ICTRANS')
+BEGIN
 truncate table dbo.ICTRANS
+END
+
+if exists (select * from sys.tables where name = 'ITEMLOC')
+BEGIN
 truncate table dbo.ITEMLOC
+END
+
+if exists (select * from sys.tables where name = 'ITEMMAST')
+BEGIN
 truncate table dbo.ITEMMAST
+END
+
+if exists (select * from sys.tables where name = 'ITEMSRC')
+BEGIN
 truncate table dbo.ITEMSRC
+END
+
+if exists (select * from sys.tables where name = 'MAINVDTL')
+BEGIN
 truncate table dbo.MAINVDTL
+END
+
+if exists (select * from sys.tables where name = 'MAINVMSG')
+BEGIN
 truncate table dbo.MAINVMSG
+END
+
+if exists (select * from sys.tables where name = 'MMDIST')
+BEGIN
 truncate table dbo.MMDIST
+END
+
+if exists (select * from sys.tables where name = 'POCODE')
+BEGIN
 truncate table dbo.POCODE
+END
+
+if exists (select * from sys.tables where name = 'POLINE')
+BEGIN
 truncate table dbo.POLINE
+END
+
+if exists (select * from sys.tables where name = 'POLINESRC')
+BEGIN
 truncate table dbo.POLINESRC
+END
+
+if exists (select * from sys.tables where name = 'PORECLINE')
+BEGIN
 truncate table dbo.PORECLINE
+END
+
+if exists (select * from sys.tables where name = 'POVAGRMTLN')
+BEGIN
 truncate table dbo.POVAGRMTLN
+END
+
+if exists (select * from sys.tables where name = 'PURCHORDER')
+BEGIN
 truncate table dbo.PURCHORDER
+END
+
+if exists (select * from sys.tables where name = 'REQHEADER')
+BEGIN
 truncate table dbo.REQHEADER
+END
+
+if exists (select * from sys.tables where name = 'REQLINE')
+BEGIN
 truncate table dbo.REQLINE
+END
+
+if exists (select * from sys.tables where name = 'REQUESTER')
+BEGIN
 truncate table dbo.REQUESTER
+END
+
+if exists (select * from sys.tables where name = 'RQLOC')
+BEGIN
 truncate table dbo.RQLOC
+END
 
 END
+
 GO
-grant exec on sp_CleanLawsonTables to appusers
+grant exec on sp_CleanLawsonTables to public
 GO
+
+
 
 --*****************************************************
 --**************************SPROC**********************
@@ -7481,7 +7500,7 @@ Print 'Job Updates Complete'
 --Version Update
 --*************************************************************************************************************************************************
 
-declare @version varchar(50) = '2.3.20160812' --Update Version Number here
+declare @version varchar(50) = '2.3.20160819' --Update Version Number here
 
 
 if not exists (select * from bluebin.Config where ConfigName = 'Version')

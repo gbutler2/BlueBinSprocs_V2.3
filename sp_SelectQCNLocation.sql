@@ -19,7 +19,7 @@ select
 					else dl.LocationID + ' - ' + dl.[LocationName] end end as LocationName
 	from qcn.QCN q
 	left join [bluebin].[DimLocation] dl on q.LocationID = dl.LocationID and dl.BlueBinFlag = 1
-
+	order by LocationID
 END
 GO
 grant exec on sp_SelectQCNLocation to appusers

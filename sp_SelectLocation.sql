@@ -16,6 +16,7 @@ LocationID,
 case when LocationID = LocationName then LocationID else LocationID + ' - ' + [LocationName] end as LocationName 
 
 FROM [bluebin].[DimLocation] where BlueBinFlag = 1
+order by LocationID
 END
 GO
 grant exec on sp_SelectLocation to appusers

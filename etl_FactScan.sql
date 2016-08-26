@@ -39,7 +39,7 @@ INTO #ICTRANS
 FROM   ICTRANS a
        INNER JOIN bluebin.DimLocation b
                ON a.FROM_TO_LOC = b.LocationID 
-WHERE b.BlueBinFlag = 1 and DOCUMENT not like '%[A-Z]%' and DOCUMENT not like '%/%'
+WHERE b.BlueBinFlag = 1 and DOCUMENT not like '%[A-Z]%' and DOCUMENT not like '%/%' and try_convert(bigint,DOCUMENT) < 2147483647  
 --and DOCUMENT like '%270943%'
 group by 
 COMPANY,

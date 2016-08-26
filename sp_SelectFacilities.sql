@@ -16,7 +16,7 @@ SELECT DISTINCT rtrim(df.[FacilityID]) as FacilityID,df.[FacilityName]
 FROM bluebin.[DimFacility] df
 
 inner join bluebin.DimLocation dl on df.FacilityID = dl.LocationFacility and dl.BlueBinFlag = 1
-order by 1 desc
+order by df.[FacilityName] asc
 
 END 
 GO

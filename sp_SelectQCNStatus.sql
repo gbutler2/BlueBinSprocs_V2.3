@@ -22,6 +22,7 @@ SET NOCOUNT ON
 		LastUpdated 
 		
 	FROM qcn.[QCNStatus]
+	order by Status
 
 END
 GO

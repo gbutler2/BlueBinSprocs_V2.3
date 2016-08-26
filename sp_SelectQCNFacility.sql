@@ -16,7 +16,7 @@ select
     df.FacilityName as FacilityName
 	from qcn.QCN q
 	left join [bluebin].[DimFacility] df on q.FacilityID = df.FacilityID 
-
+	order by df.FacilityName
 END
 GO
 grant exec on sp_SelectQCNFacility to appusers

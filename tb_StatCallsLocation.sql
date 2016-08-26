@@ -17,16 +17,15 @@ SELECT
 	dl.BlueBinFlag,
 	TRANS_DATE as Date,
     COUNT(*) as StatCalls,
-    LTRIM(RTRIM(c.ACCT_UNIT)) + ' - '+ c.DESCRIPTION       as Department
+    case when c.ACCT_UNIT is null then 'None' else LTRIM(RTRIM(c.ACCT_UNIT)) + ' - '+ c.DESCRIPTION  end as Department
 FROM
     ICTRANS a 
 INNER JOIN
 RQLOC b ON a.FROM_TO_CMPY = b.COMPANY AND a.FROM_TO_LOC = b.REQ_LOCATION
-INNER JOIN
-GLNAMES c ON b.COMPANY = c.COMPANY AND b.ISS_ACCT_UNIT = c.ACCT_UNIT
+LEFT JOIN GLNAMES c ON b.COMPANY = c.COMPANY AND b.ISS_ACCT_UNIT = c.ACCT_UNIT
 INNER JOIN bluebin.DimFacility df on a.FROM_TO_CMPY = df.FacilityID
 INNER JOIN bluebin.DimLocation dl on b.REQ_LOCATION = dl.LocationID
-WHERE SYSTEM_CD = 'IC' AND DOC_TYPE = 'IS' --and dl.BlueBinFlag = 1
+WHERE SYSTEM_CD = 'IC' AND DOC_TYPE = 'IS' and TRANS_DATE > getdate() -15---and dl.BlueBinFlag = 1
 GROUP BY
     a.FROM_TO_CMPY,
 	df.FacilityName,

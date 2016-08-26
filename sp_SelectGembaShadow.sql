@@ -17,7 +17,7 @@ SET NOCOUNT ON
 	
 	WHERE 
 		Title in (Select ConfigValue from bluebin.Config where ConfigName = 'GembaShadowTitle')
-
+		order by 1
 END
 GO
 grant exec on sp_SelectGembaShadow to appusers

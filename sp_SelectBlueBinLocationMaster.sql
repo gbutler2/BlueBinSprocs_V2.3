@@ -2,7 +2,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'sp_SelectBlueBinL
 drop procedure sp_SelectBlueBinLocationMaster
 GO
 
---exec sp_SelectBlueBinLocationMaster 'BB',''
+--exec sp_SelectBlueBinLocationMaster '',''
 CREATE PROCEDURE sp_SelectBlueBinLocationMaster
 @LocationName varchar(255),
 @AcctUnit varchar(40)

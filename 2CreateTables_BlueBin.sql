@@ -453,7 +453,7 @@ if not exists(select * from bluebin.Config where ConfigType = 'Reports' and Conf
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description]) VALUES
 ('Src-Buyer Performance','1',1,getdate(),'Reports','Setting for whether to display the Buyer Performance DB'),
-('Src-Specials Performance','1',1,getdate(),'Reports','Setting for whether to display the Specials DB'),
+('Src-Special Performance','1',1,getdate(),'Reports','Setting for whether to display the Specials DB'),
 ('Src-Supplier Performance','1',1,getdate(),'Reports','Setting for whether to display the Supplier Performance DB'),
 ('Src-Cost Impact Calculator','1',1,getdate(),'Reports','Setting for whether to display the Item Cost Impact DB'),
 ('Src-Open PO Report','1',1,getdate(),'Reports','Setting for whether to display the Open PO Report'),

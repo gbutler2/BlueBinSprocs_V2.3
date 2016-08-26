@@ -27,12 +27,12 @@ With list as
 			from bluebin.FactScan fs
 			inner join bluebin.DimBin db on fs.BinKey = db.BinKey
 			inner join bluebin.DimLocation dl on db.LocationID = dl.LocationID and dl.BlueBinFlag = 1
-			where fs.OrderDate > getdate() -32
+			where fs.OrderDate > getdate() -2
 			)
 
 
 select 
-convert(datetime,(convert(DATE,getdate()-1)),112) as CREATION_DATE,
+convert(datetime,(convert(DATE,getdate())),112) as CREATION_DATE,
 [list].COMPANY,
 df.FacilityName as FacilityName,
 [list].REQ_LOCATION,
