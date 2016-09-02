@@ -11,7 +11,7 @@ exec sp_InsertScanBatch 'BB013','gbutler@bluebin.com','Receive'
 */
 
 CREATE PROCEDURE sp_InsertScanBatch
-@Location char(10),
+@Location varchar(10),
 @Scanner varchar(255),
 @ScanType varchar(50)
 

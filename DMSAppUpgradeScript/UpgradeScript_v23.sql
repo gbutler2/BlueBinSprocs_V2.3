@@ -211,8 +211,14 @@ update qcn.QCN set AssignedUserID = z.ID from
 
 --Update QCN Types
 --select * from qcn.QCNType
+if not exists(select * from qcn.QCNType where Name = 'REMOVE')
+BEGIN
 insert into qcn.QCNType select 'REMOVE','1',getdate(),''
+END
+if not exists(select * from qcn.QCNType where Name = 'MODIFY')
+BEGIN
 insert into qcn.QCNType select 'MODIFY','1',getdate(),''
+END
 update qcn.QCN set QCNTypeID = (Select QCNTypeID from qcn.QCNType where Name = 'MODIFY') where QCNTypeID in (Select QCNTypeID from qcn.QCNType where Name in('CHANGE','UPDATE'))
 update qcn.QCN set QCNTypeID = (Select QCNTypeID from qcn.QCNType where Name = 'REMOVE') where QCNTypeID in (Select QCNTypeID from qcn.QCNType where Name in('DELETE'))
 delete from qcn.QCNType where Name in ('CHANGE','UPDATE','DELETE')
@@ -230,7 +236,7 @@ update qcn.QCNStatus set LastUpdated = getdate(),Status = 'New/NotStarted', Desc
 update qcn.QCNStatus set LastUpdated = getdate(),Status = 'InProgress/Approved', Description = 'No additional support needed, QCN will be completed within 10 working days.' where Status = 'InProgress'
 
 update qcn.QCN set LastUpdated = getdate(),QCNStatusID = (Select QCNStatusID from qcn.QCNStatus where Status = 'NeedsMoreInfo') where QCNStatusID in (Select QCNStatusID from qcn.QCNStatus where Status in('OnHold','FutureVersion','InReview'))
-
+update qcn.QCN set DateCompleted = LastUpdated where QCNStatusID = (Select QCNStatusID from qcn.QCNStatus where Status = 'Completed') and DateCompleted is null
 delete from qcn.QCNStatus where Status in ('OnHold','FutureVersion','InReview')
 
 
@@ -580,6 +586,7 @@ END
 if not exists(select * from bluebin.Config where ConfigType = 'Reports' and ConfigName like 'OP-%')  
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description]) VALUES
+('OP-Item Usage','0',1,getdate(),'Reports','Setting for whether to display the Item Usage Report'),
 ('OP-Pick Line Volume','1',1,getdate(),'Reports','Setting for whether to display the Pick Line Volume Report'),
 ('OP-Supply Spend','1',1,getdate(),'Reports','Setting for whether to display the Supply Spend Report'),
 ('OP-Overall Line Volume','1',1,getdate(),'Reports','Setting for whether to display the Overall Line Volume Report'),
@@ -778,7 +785,7 @@ BEGIN
 CREATE TABLE [bluebin].[ConesDeployed](
 	[ConesDeployedID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
 	FacilityID int NOT NULL,
-	LocationID varchar(7) NOT NULL,
+	LocationID varchar(10) NOT NULL,
 	ItemID varchar(32) NOT NULL,
 	ConeDeployed int,
 	Deployed datetime,
@@ -868,6 +875,21 @@ END
 END
 GO
 
+--*****************************************************
+--**************************NEWTABLE**********************
+
+
+if not exists (select * from sys.tables where name = 'ALT_REQ_LOCATION')
+BEGIN
+CREATE TABLE [bluebin].[ALT_REQ_LOCATION](
+	[COMPANY] INT NOT NULL,
+	[REQ_LOCATION] varchar(12) not null,
+	Active int not null,
+	LastUpdated datetime not null
+
+)
+END
+GO
 
 --*****************************************************
 --**************************NEWTABLE**********************
@@ -878,7 +900,7 @@ BEGIN
 CREATE TABLE [bluebin].[BlueBinParMaster](
 	[ParMasterID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
 	[FacilityID] smallint not null,
-	[LocationID] char (10) NOT NULL,
+	[LocationID] varchar (10) NOT NULL,
 	[ItemID] char (32) NOT NULL,
 	[BinSequence] varchar (50) NOT NULL,
 	[BinSize] varchar(5) NULL,
@@ -886,7 +908,7 @@ CREATE TABLE [bluebin].[BlueBinParMaster](
 	[BinQuantity] int NULL,
     [LeadTime] smallint NULL,
     [ItemType] varchar (10) NULL,
-	[WHLocationID] char(10) null,
+	[WHLocationID] varchar(10) null,
 	[WHSequence] varchar(50) null,
 	[PatientCharge] int not NULL,
 	[Updated] int not null,
@@ -907,7 +929,7 @@ CREATE TABLE [bluebin].[DimBinHistory](
 	[Date] date,
 	BinKey int null,
 	[FacilityID] smallint not null,
-	[LocationID] char(5) not null,
+	[LocationID] varchar(10) not null,
 	[ItemID] char(32) NOT NULL,
 	BinQty int not null,
 	LastBinQty int null,
@@ -1051,7 +1073,7 @@ BEGIN
 CREATE TABLE [scan].[ScanBatch](
 	[ScanBatchID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
 	[FacilityID] int NOT NULL,
-	[LocationID] char(10) NOT NULL,
+	[LocationID] varchar(10) NOT NULL,
 	[BlueBinUserID] int NULL,
 	[Active] int NOT NULL,
 	[Extract] int NOT NULL,
@@ -1377,7 +1399,7 @@ BEGIN
 CREATE TABLE [gemba].[GembaAuditNode](
 	[GembaAuditNodeID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
 	[Date] datetime not null,
-	[LocationID] char(10) not null,
+	[LocationID] varchar(10) not null,
 	[AuditerUserID]  int NOT NULL,
 	[AdditionalComments] varchar(max) NULL,
     [PS_EmptyBins] int NOT NULL,
@@ -1436,7 +1458,7 @@ if not exists (select * from sys.tables where name = 'QCN')
 BEGIN
 CREATE TABLE [qcn].[QCN](
 	[QCNID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
-	[LocationID] char(10) not null,
+	[LocationID] varchar(10) not null,
 	[ItemID] char(32) null,
 	[RequesterUserID] int NOT NULL,
 	[AssignedUserID] int NULL,
@@ -1634,7 +1656,7 @@ SET NOCOUNT ON
 
 if exists (select * from bluebin.DimItem where ItemID = @Item) 
 BEGIN
-declare @ScanMatchLocationID varchar(7) 
+declare @ScanMatchLocationID varchar(10) 
 declare @ScanMatchFacilityID int 
 declare @ScanMatchItemID varchar(32) = @Item
 declare @ScanMatchScanLineOrderID int
@@ -2698,7 +2720,7 @@ exec sp_InsertScanBatch 'BB013','gbutler@bluebin.com','Receive'
 */
 
 CREATE PROCEDURE sp_InsertScanBatch
-@Location char(10),
+@Location varchar(10),
 @Scanner varchar(255),
 @ScanType varchar(50)
 
@@ -2779,7 +2801,9 @@ case when sb.ScanType like '%Tray%' then 'Tray' else 'Scan' end as Origin,
 case when max(sl.Line) - isnull(sm3.Ct,0) > 0 then  
 		case when sm3.Ct > 1 then 'Partial' else 'No' end
 	 else 'Yes' end as Extracted,
-case when max(sl.Line) - isnull(sm2.Ct,0) > 0 then 'No' else 'Yes' end as [Matched]
+case when max(sl.Line) - isnull(sm2.Ct,0) > 0 then 
+		case when sm2.Ct > 1 then 'Partial' else 'No' end 
+	 else 'Yes' end as [Matched]
 
 from scan.ScanBatch sb
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID
@@ -2815,7 +2839,6 @@ END
 GO
 grant exec on sp_SelectScanBatch to public
 GO
-
 
 
 
@@ -3316,13 +3339,13 @@ ClinicalDescription = @ClinicalDescription,
 ApprovedBy = @ApprovedBy,
 [AssignedUserID] = @Assigned,
 [QCNCID] =  @QCNComplexity,
-[QCNTypeID] = (select [QCNTypeID] from [qcn].[QCNType] where [Name] = @QCNType),
+[QCNTypeID] = (select max([QCNTypeID]) from [qcn].[QCNType] where [Name] = @QCNType),
 [Details] = @Details,
 [Updates] = @Updates,
 [DateCompleted] = Case when @QCNStatus in ('Rejected','Completed') and DateCompleted is null then getdate() 
                         when @QCNStatus in ('Rejected','Completed') and DateCompleted is not null then DateCompleted
                             else NULL end,
-[QCNStatusID] = (select [QCNStatusID] from [qcn].[QCNStatus] where [Status] = @QCNStatus),
+[QCNStatusID] = (select max([QCNStatusID]) from [qcn].[QCNStatus] where [Status] = @QCNStatus),
 [LastUpdated] = getdate(),
 InternalReference = @InternalReference,
 ManuNumName = @ManuNumName,
@@ -4731,7 +4754,7 @@ GO
 
 CREATE PROCEDURE sp_EditGembaAuditNode
 @GembaAuditNodeID int,
-@Location char(10),
+@Location varchar(10),
 @AdditionalComments varchar(max),
 @PS_EmptyBins int,
 @PS_BackBins int,
@@ -4838,7 +4861,7 @@ GO
 --exec sp_InsertGembaAuditNode 'TEST'
 
 CREATE PROCEDURE sp_InsertGembaAuditNode
-@Location char(10),
+@Location varchar(10),
 @Auditer varchar(255),
 @AdditionalComments varchar(max),
 @PS_EmptyBins int,
@@ -5168,13 +5191,13 @@ case when @ItemID = '' then NULL else @ItemID end,
 @ApprovedBy,
 case when @Assigned = '' then NULL else @Assigned end,
 @QCNComplexity,
-(select [QCNTypeID] from [qcn].[QCNType] where [Name] = @QCNType),
+(select max([QCNTypeID]) from [qcn].[QCNType] where [Name] = @QCNType),
 @Details,
 @Updates,
 @DateRequested,
 getdate(),
 Case when @QCNStatus in('Rejected','Completed') then getdate() else NULL end,
-(select [QCNStatusID] from [qcn].[QCNStatus] where [Status] = @QCNStatus),
+(select max([QCNStatusID]) from [qcn].[QCNStatus] where [Status] = @QCNStatus),
 1, --Active
 getdate(), --LastUpdated
 @InternalReference,
@@ -6399,7 +6422,7 @@ GO
 --exec sp_SelectConesDeployed '',''
 
 CREATE PROCEDURE sp_SelectConesDeployed
-@Location varchar(7),
+@Location varchar(10),
 @Item varchar(32)
 
 --WITH ENCRYPTION
@@ -6454,7 +6477,7 @@ GO
 
 CREATE PROCEDURE sp_InsertConesDeployed
 @FacilityID int
-,@LocationID varchar (7)
+,@LocationID varchar (10)
 ,@ItemID varchar (32)
 ,@ExpectedDelivery datetime
 ,@SubProduct varchar(3)
@@ -6902,7 +6925,7 @@ from dbo.REQLINE,
 		from bluebin.FactBinSnapshot
 		where LastScannedDate > getdate() -7
 		) db 
-where CREATION_DATE > getdate() -7 and left(REQ_LOCATION,2) in (select ConfigValue from bluebin.Config where ConfigName = ''REQ_LOCATION'')
+where CREATION_DATE > getdate() -7 and (left(REQ_LOCATION,2) in (select ConfigValue from bluebin.Config where ConfigName = ''REQ_LOCATION'') or REQ_LOCATION in (Select REQ_LOCATION from bluebin.ALT_REQ_LOCATION))
 group by 	
 	db.[MaxSnapshotDate],
 	db.[DBUpToDate?]
@@ -7064,11 +7087,170 @@ BEGIN
 truncate table dbo.RQLOC
 END
 
+if exists (select * from sys.tables where name = 'RQLMXVAL')
+BEGIN
+truncate table dbo.RQLMXVAL
+END
+
 END
 
 GO
 grant exec on sp_CleanLawsonTables to public
 GO
+
+
+
+
+--*****************************************************
+--**************************SPROC**********************
+
+
+if exists (select * from dbo.sysobjects where id = object_id(N'sp_CleanPeoplesoftTables') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure sp_CleanPeoplesoftTables
+GO
+
+--exec sp_CleanPeoplesoftTables
+
+CREATE PROCEDURE sp_CleanPeoplesoftTables
+--WITH ENCRYPTION
+AS
+BEGIN
+
+if exists (select * from sys.tables where name = 'BRAND_NAMES_INV')
+BEGIN
+truncate table dbo.BRAND_NAMES_INV
+END
+
+if exists (select * from sys.tables where name = 'BU_ATTRIB_INV')
+BEGIN
+truncate table dbo.BU_ATTRIB_INV
+END
+
+if exists (select * from sys.tables where name = 'BU_ITEMS_INV')
+BEGIN
+truncate table dbo.BU_ITEMS_INV
+END
+
+if exists (select * from sys.tables where name = 'CART_ATTRIB_INV')
+BEGIN
+truncate table dbo.CART_ATTRIB_INV
+END
+
+if exists (select * from sys.tables where name = 'CART_CF_INF_INV')
+BEGIN
+truncate table dbo.CART_CF_INF_INV
+END
+
+if exists (select * from sys.tables where name = 'DEMAND_INF_INV')
+BEGIN
+truncate table dbo.DEMAND_INF_INV
+END
+
+if exists (select * from sys.tables where name = 'CART_TEMP_INV')
+BEGIN
+truncate table dbo.CART_TEMP_INV
+END
+
+if exists (select * from sys.tables where name = 'IN_DEMAND')
+BEGIN
+truncate table dbo.IN_DEMAND
+END
+
+if exists (select * from sys.tables where name = 'ITEM_MFG')
+BEGIN
+truncate table dbo.ITEM_MFG
+END
+
+if exists (select * from sys.tables where name = 'ITM_VENDOR')
+BEGIN
+truncate table dbo.ITM_VENDOR
+END
+
+if exists (select * from sys.tables where name = 'LOCATION_TBL')
+BEGIN
+truncate table dbo.LOCATION_TBL
+END
+
+if exists (select * from sys.tables where name = 'MANUFACTURER')
+BEGIN
+truncate table dbo.MANUFACTURER
+END
+
+if exists (select * from sys.tables where name = 'MASTER_ITEM_TBL')
+BEGIN
+truncate table dbo.MASTER_ITEM_TBL
+END
+
+if exists (select * from sys.tables where name = 'PO_HDR')
+BEGIN
+truncate table dbo.PO_HDR
+END
+
+if exists (select * from sys.tables where name = 'PO_LINE')
+BEGIN
+truncate table dbo.PO_LINE
+END
+
+if exists (select * from sys.tables where name = 'PO_LINE_DISTRIB')
+BEGIN
+truncate table dbo.PO_LINE_DISTRIB
+END
+
+if exists (select * from sys.tables where name = 'PURCH_ITEM_ATTRIB')
+BEGIN
+truncate table dbo.PURCH_ITEM_ATTRIB
+END
+
+if exists (select * from sys.tables where name = 'PURCH_ITEM_BU')
+BEGIN
+truncate table dbo.PURCH_ITEM_BU
+END
+
+if exists (select * from sys.tables where name = 'RECV_HDR')
+BEGIN
+truncate table dbo.RECV_HDR
+END
+
+if exists (select * from sys.tables where name = 'RECV_LN_DISTRIB')
+BEGIN
+truncate table dbo.RECV_LN_DISTRIB
+END
+
+if exists (select * from sys.tables where name = 'RECV_LN_SHIP')
+BEGIN
+truncate table dbo.RECV_LN_SHIP
+END
+
+if exists (select * from sys.tables where name = 'REQ_HDR')
+BEGIN
+truncate table dbo.REQ_HDR
+END
+
+if exists (select * from sys.tables where name = 'REQ_LINE')
+BEGIN
+truncate table dbo.REQ_LINE
+END
+
+if exists (select * from sys.tables where name = 'REQ_LN_DISTRIB')
+BEGIN
+truncate table dbo.REQ_LN_DISTRIB
+END
+
+if exists (select * from sys.tables where name = 'VENDOR')
+BEGIN
+truncate table dbo.VENDOR
+END
+
+
+
+END
+
+GO
+grant exec on sp_CleanPeoplesoftTables to public
+GO
+
+
+
 
 
 

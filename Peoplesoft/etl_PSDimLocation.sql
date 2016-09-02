@@ -20,22 +20,30 @@ AS
 
 /*********************		CREATE DimLocation	****************************/
    SELECT Row_number()
-             OVER(
-               ORDER BY REQ_LOCATION) AS LocationKey,
-           REQ_LOCATION               AS LocationID,
-           NAME                       AS LocationName,
-           COMPANY                    AS LocationFacility,
-           CASE
-             WHEN ACTIVE_STATUS = 'A' and LEFT(REQ_LOCATION, 2) IN (SELECT [ConfigValue]
+         OVER(
+           ORDER BY a.LOCATION) AS LocationKey,
+       a.LOCATION            AS LocationID,
+       UPPER(DESCR)          AS LocationName,
+	   df.FacilityID		 AS LocationFacility,
+		CASE
+             WHEN a.EFF_STATUS = 'A' and (
+											LEFT(a.LOCATION, 2) COLLATE DATABASE_DEFAULT IN (SELECT [ConfigValue] 
                                             FROM   [bluebin].[Config]
                                             WHERE  [ConfigName] = 'REQ_LOCATION'
-                                                   AND Active = 1) THEN 1
+                                                   AND Active = 1) 
+										or a.LOCATION COLLATE DATABASE_DEFAULT in (Select REQ_LOCATION from bluebin.ALT_REQ_LOCATION)
+											)		   
+												   
+										THEN 1
              ELSE 0
            END                        AS BlueBinFlag,
-		   ACTIVE_STATUS
-    INTO   bluebin.DimLocation
-    FROM   RQLOC 
+		   a.EFF_STATUS as ACTIVE_STATUS
+INTO bluebin.DimLocation
+FROM   dbo.LOCATION_TBL a 
+INNER JOIN (SELECT LOCATION, MIN(EFFDT) AS EFFDT FROM dbo.LOCATION_TBL GROUP BY LOCATION) b ON a.LOCATION  = b.LOCATION AND a.EFFDT = b.EFFDT 
+INNER JOIN bluebin.DimFacility df on a.BUILDING COLLATE DATABASE_DEFAULT = df.FacilityName
 
+--WHERE  a.EFF_STATUS = 'A'
 
 
 GO
@@ -43,6 +51,5 @@ GO
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'DimLocation'
-
 
 

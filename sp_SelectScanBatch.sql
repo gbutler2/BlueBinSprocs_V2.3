@@ -32,7 +32,9 @@ case when sb.ScanType like '%Tray%' then 'Tray' else 'Scan' end as Origin,
 case when max(sl.Line) - isnull(sm3.Ct,0) > 0 then  
 		case when sm3.Ct > 1 then 'Partial' else 'No' end
 	 else 'Yes' end as Extracted,
-case when max(sl.Line) - isnull(sm2.Ct,0) > 0 then 'No' else 'Yes' end as [Matched]
+case when max(sl.Line) - isnull(sm2.Ct,0) > 0 then 
+		case when sm2.Ct > 1 then 'Partial' else 'No' end 
+	 else 'Yes' end as [Matched]
 
 from scan.ScanBatch sb
 inner join bluebin.DimLocation dl on sb.LocationID = dl.LocationID

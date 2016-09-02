@@ -16,7 +16,7 @@ BEGIN
 CREATE TABLE [scan].[ScanBatch](
 	[ScanBatchID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
 	[FacilityID] int NOT NULL,
-	[LocationID] char(10) NOT NULL,
+	[LocationID] varchar(10) NOT NULL,
 	[BlueBinUserID] int NULL,
 	[Active] int NOT NULL,
 	[Extract] int NOT NULL,

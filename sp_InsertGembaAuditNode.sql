@@ -5,7 +5,7 @@ GO
 --exec sp_InsertGembaAuditNode 'TEST'
 
 CREATE PROCEDURE sp_InsertGembaAuditNode
-@Location char(10),
+@Location varchar(10),
 LOWER(@Auditer) varchar(255),
 @AdditionalComments varchar(max),
 @PS_EmptyBins int,

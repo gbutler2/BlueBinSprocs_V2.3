@@ -11,6 +11,18 @@ SET ANSI_PADDING ON
 GO
 
 
+if not exists (select * from sys.tables where name = 'ALT_REQ_LOCATION')
+BEGIN
+CREATE TABLE [bluebin].[ALT_REQ_LOCATION](
+	[COMPANY] INT NOT NULL,
+	[REQ_LOCATION] varchar(12) not null,
+	Active int not null,
+	LastUpdated datetime not null
+
+)
+END
+GO
+
 
 if not exists (select * from sys.tables where name = 'Walkthrough')
 BEGIN
@@ -36,7 +48,7 @@ BEGIN
 CREATE TABLE [bluebin].[ConesDeployed](
 	[ConesDeployedID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
 	FacilityID int NOT NULL,
-	LocationID varchar(7) NOT NULL,
+	LocationID varchar(10) NOT NULL,
 	ItemID varchar(32) NOT NULL,
 	ConeDeployed int,
 	Deployed datetime,
@@ -404,7 +416,7 @@ CREATE TABLE [bluebin].[DimBinHistory](
 	[Date] date,
 	BinKey int null,
 	[FacilityID] smallint not null,
-	[LocationID] char(5) not null,
+	[LocationID] varchar(10) not null,
 	[ItemID] char(32) NOT NULL,
 	BinQty int not null,
 	LastBinQty int null,

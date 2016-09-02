@@ -237,12 +237,6 @@ GO
 
 
 
---/******************************************
-
---			DimItem
-
---******************************************/
-
 
 --/******************************************
 
@@ -297,7 +291,7 @@ SELECT
 					when a.USER_FIELD1 is null or a.USER_FIELD1 = '' then 
 					case 
 						when c.DESCRIPTION is null or c.DESCRIPTION = '' then '*NEEDS*'
-					else c.DESCRIPTION  end
+					else rtrim(c.DESCRIPTION) + '*' end
 				else a.USER_FIELD1 end
 			else a.USER_FIELD3 end
 		else b.ClinicalDescription end	
@@ -310,8 +304,8 @@ FROM
 	USER_FIELD1,
 	USER_FIELD3
 FROM ITEMLOC a 
-INNER JOIN RQLOC b ON a.LOCATION = b.REQ_LOCATION 
-WHERE LEFT(REQ_LOCATION, 2) IN (SELECT [ConfigValue] FROM   [bluebin].[Config] WHERE  [ConfigName] = 'REQ_LOCATION' AND Active = 1)) a
+INNER JOIN RQLOC b ON a.LOCATION = b.REQ_LOCATION and a.COMPANY = b.COMPANY
+WHERE LEFT(REQ_LOCATION, 2) IN (SELECT [ConfigValue] FROM   [bluebin].[Config] WHERE  [ConfigName] = 'REQ_LOCATION' AND Active = 1) or REQ_LOCATION in (Select REQ_LOCATION from bluebin.ALT_REQ_LOCATION)) a
 LEFT JOIN 
 (SELECT 
 	distinct ITEM, 
@@ -408,9 +402,9 @@ SELECT Row_number()
 		then 
 			case 
 				when e.ClinicalDescription is null 
-				then rtrim(a.DESCRIPTION)  
+				then rtrim(a.DESCRIPTION) + '*' 
 				else e.ClinicalDescription end
-		else rtrim(a.DESCRIPTION)  end             AS ItemClinicalDescription,
+		else rtrim(a.DESCRIPTION) + '*' end             AS ItemClinicalDescription,
        a.ACTIVE_STATUS                     AS ActiveStatus,
        icm.DESCRIPTION                     AS ItemManufacturer, --b.DESCRIPTION
 	   --a.MANUF_NBR                         AS ItemManufacturer, --b.DESCRIPTION
@@ -448,7 +442,7 @@ FROM   ITEMMAST a
 --where a.ITEM = '30003'
 order by a.ITEM
 
---select * from bluebin.DimItem where ItemClinicalDescription is not null
+
 
 /*********************		DROP Temp Tables	*********************************/
 
@@ -465,11 +459,12 @@ DROP TABLE #ItemVendor
 
 GO
 
+
+
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'DimItem'
 GO
-
 
 
 
@@ -507,10 +502,15 @@ AS
            NAME                       AS LocationName,
            COMPANY                    AS LocationFacility,
            CASE
-             WHEN ACTIVE_STATUS = 'A' and LEFT(REQ_LOCATION, 2) IN (SELECT [ConfigValue]
+             WHEN ACTIVE_STATUS = 'A' and (
+											LEFT(REQ_LOCATION, 2) IN (SELECT [ConfigValue]
                                             FROM   [bluebin].[Config]
                                             WHERE  [ConfigName] = 'REQ_LOCATION'
-                                                   AND Active = 1) THEN 1
+                                                   AND Active = 1) 
+										or REQ_LOCATION in (Select REQ_LOCATION from bluebin.ALT_REQ_LOCATION)
+											)		   
+												   
+										THEN 1
              ELSE 0
            END                        AS BlueBinFlag,
 		   ACTIVE_STATUS
@@ -524,6 +524,7 @@ GO
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'DimLocation'
+
 
 
 
@@ -2273,7 +2274,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'tb_CostVariance')
 drop procedure tb_CostVariance
 GO
 
---exec tb_ItemLocator
+--tb_CostVariance
 
 CREATE PROCEDURE tb_CostVariance
 
@@ -2506,7 +2507,7 @@ FROM
 		else CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN SUBSTRING (PREFER_BIN,4,2) ELSE SUBSTRING(PREFER_BIN, 3,2) END END as Position	
 FROM ITEMLOC a 
 INNER JOIN RQLOC b ON a.LOCATION = b.REQ_LOCATION and a.COMPANY = b.COMPANY
-WHERE LEFT(REQ_LOCATION, 2) IN (SELECT [ConfigValue] FROM   [bluebin].[Config] WHERE  [ConfigName] = 'REQ_LOCATION' AND Active = 1)) a
+WHERE LEFT(REQ_LOCATION, 2) IN (SELECT [ConfigValue] FROM   [bluebin].[Config] WHERE  [ConfigName] = 'REQ_LOCATION' AND Active = 1) or REQ_LOCATION in (Select REQ_LOCATION from bluebin.ALT_REQ_LOCATION)) a
 LEFT JOIN 
 (SELECT 
 	ITEM, 
@@ -2526,11 +2527,9 @@ GO
 grant exec on tb_ItemLocator to public
 GO
 
-
 --*********************************************************************************************
 --Tableau Sproc  These load data into the datasources for Tableau
 --*********************************************************************************************
-
 if exists (select * from dbo.sysobjects where id = object_id(N'tb_LineVolume') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure tb_LineVolume
 GO
@@ -2552,11 +2551,14 @@ CREATION_DATE   AS Date,
        CASE
          WHEN LEFT(a.REQ_LOCATION, 2) IN (SELECT ConfigValue
                                           FROM   [bluebin].[Config]
-                                          WHERE  ConfigName = 'REQ_LOCATION') THEN 'BlueBin'
+                                          WHERE  ConfigName = 'REQ_LOCATION') 
+											or 
+										  a.REQ_LOCATION in (Select REQ_LOCATION from bluebin.ALT_REQ_LOCATION) 
+										  THEN 'BlueBin'
          ELSE 'Non BlueBin'
        END             AS LineType,
        b.ISS_ACCT_UNIT AS AcctUnit,
-       c.DESCRIPTION   AS AcctUnitName,
+       ISNULL(c.DESCRIPTION,'Unknown')   AS AcctUnitName,
        a.REQ_LOCATION  AS Location,
        b.NAME          AS LocationName,
        1               AS LineCount
@@ -2565,7 +2567,7 @@ FROM   REQLINE a
        INNER JOIN RQLOC b
                ON a.COMPANY = b.COMPANY
                   AND a.REQ_LOCATION = b.REQ_LOCATION
-       INNER JOIN GLNAMES c
+       LEFT JOIN GLNAMES c
                ON b.COMPANY = c.COMPANY
                   AND b.ISS_ACCT_UNIT = c.ACCT_UNIT 
 	   INNER JOIN bluebin.DimFacility df on rtrim(a.COMPANY) = rtrim(df.FacilityID)
@@ -2574,6 +2576,7 @@ END
 GO
 grant exec on tb_LineVolume to public
 GO
+
 
 
 --*********************************************************************************************
@@ -3875,12 +3878,122 @@ GO
 --*********************************************************************************************
 --Tableau Sproc  These load data into the datasources for Tableau
 --*********************************************************************************************
+if exists (select * from dbo.sysobjects where id = object_id(N'tb_ItemUsageSourcing') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure tb_ItemUsageSourcing
+GO
+
+--exec tb_ItemUsageSourcing
+
+CREATE PROCEDURE tb_ItemUsageSourcing
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+select 
+FacilityName,
+LocationName,
+ItemID,
+ItemClinicalDescription,
+BinUOM,
+convert(int,TotalPar) as TotalPar,
+[Month],
+Sum(OrderQty) as OrderQty,
+Sum(OrderQty*BinCurrentCost) as Cost
+from (
+	select
+	k.FacilityName,
+	dl.LocationName,
+	k.ItemNumber as ItemID,
+	di.ItemClinicalDescription,
+	dateadd(month,datediff(month,0,k.[PODate]),0) as [Month],
+	k.BuyUOM as BinUOM,
+	k.QtyOrdered as OrderQty,
+	db.BinQty as TotalPar,
+	db.BinCurrentCost
+	from tableau.Sourcing k
+	inner join bluebin.DimBin db on k.PurchaseFacility = db.BinFacility and k.PurchaseLocation = db.LocationID and k.ItemNumber = db.ItemID
+	inner join bluebin.DimLocation dl on k.PurchaseLocation = dl.LocationID
+	inner join bluebin.DimItem di on k.ItemNumber = di.ItemID
+
+	where k.QtyOrdered is not null and k.BlueBinFlag = 'Yes' 
+	--and k.PODate > getdate() -10
+	) a
+
+group by
+FacilityName,
+LocationName,
+ItemID,
+ItemClinicalDescription,
+BinUOM,
+convert(int,TotalPar),
+[Month]
+
+END
+GO
+grant exec on tb_ItemUsageSourcing to public
+GO
+
 
 
 --*********************************************************************************************
 --Tableau Sproc  These load data into the datasources for Tableau
 --*********************************************************************************************
+if exists (select * from dbo.sysobjects where id = object_id(N'tb_ItemUsageKanban') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure tb_ItemUsageKanban
+GO
 
+--exec tb_ItemUsageKanban
+/*
+select distinct PODate from tableau.Sourcing
+*/
+CREATE PROCEDURE tb_ItemUsageKanban
+
+--WITH ENCRYPTION
+AS
+BEGIN
+SET NOCOUNT ON
+
+select 
+FacilityName,
+LocationName,
+ItemID,
+ItemClinicalDescription,
+BinUOM,
+convert(int,TotalPar) as TotalPar,
+[Month],
+Sum(OrderQty) as OrderQty,
+Sum(OrderQty*BinCurrentCost) as Cost
+from (
+	select
+	k.FacilityName,
+	k.LocationName,
+	k.ItemID,
+	k.ItemClinicalDescription,
+	dateadd(month,datediff(month,0,k.[Date]),0) as [Month],
+	k.BinUOM,
+	k.OrderQty,
+	db.BinQty as TotalPar,
+	db.BinCurrentCost
+	from tableau.Kanban k
+	inner join bluebin.DimBin db on k.BinKey = db.BinKey
+
+	where k.OrderQty is not null) a
+
+group by
+FacilityName,
+LocationName,
+ItemID,
+ItemClinicalDescription,
+BinUOM,
+convert(int,TotalPar),
+[Month]
+
+END
+GO
+grant exec on tb_ItemUsageKanban to public
+GO
 
 
 Print 'Tableau (tb) sprocs updated'

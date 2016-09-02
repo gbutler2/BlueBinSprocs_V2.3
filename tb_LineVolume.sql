@@ -19,11 +19,14 @@ CREATION_DATE   AS Date,
        CASE
          WHEN LEFT(a.REQ_LOCATION, 2) IN (SELECT ConfigValue
                                           FROM   [bluebin].[Config]
-                                          WHERE  ConfigName = 'REQ_LOCATION') THEN 'BlueBin'
+                                          WHERE  ConfigName = 'REQ_LOCATION') 
+											or 
+										  a.REQ_LOCATION in (Select REQ_LOCATION from bluebin.ALT_REQ_LOCATION) 
+										  THEN 'BlueBin'
          ELSE 'Non BlueBin'
        END             AS LineType,
        b.ISS_ACCT_UNIT AS AcctUnit,
-       c.DESCRIPTION   AS AcctUnitName,
+       ISNULL(c.DESCRIPTION,'Unknown')   AS AcctUnitName,
        a.REQ_LOCATION  AS Location,
        b.NAME          AS LocationName,
        1               AS LineCount
@@ -32,7 +35,7 @@ FROM   REQLINE a
        INNER JOIN RQLOC b
                ON a.COMPANY = b.COMPANY
                   AND a.REQ_LOCATION = b.REQ_LOCATION
-       INNER JOIN GLNAMES c
+       LEFT JOIN GLNAMES c
                ON b.COMPANY = c.COMPANY
                   AND b.ISS_ACCT_UNIT = c.ACCT_UNIT 
 	   INNER JOIN bluebin.DimFacility df on rtrim(a.COMPANY) = rtrim(df.FacilityID)
@@ -41,3 +44,4 @@ END
 GO
 grant exec on tb_LineVolume to public
 GO
+

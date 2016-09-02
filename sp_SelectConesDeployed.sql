@@ -5,7 +5,7 @@ GO
 --exec sp_SelectConesDeployed '',''
 
 CREATE PROCEDURE sp_SelectConesDeployed
-@Location varchar(7),
+@Location varchar(10),
 @Item varchar(32)
 
 --WITH ENCRYPTION

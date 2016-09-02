@@ -2,7 +2,7 @@ if exists (select * from dbo.sysobjects where id = object_id(N'ssp_BBS') and OBJ
 drop procedure ssp_BBS
 GO
 
---exec ssp_BBS 'UTMC'
+--exec ssp_BBS 'Trinity_MasonCity'
 
 CREATE PROCEDURE ssp_BBS
 @DB varchar(10)
@@ -37,7 +37,7 @@ from dbo.REQLINE,
 		from bluebin.FactBinSnapshot
 		where LastScannedDate > getdate() -7
 		) db 
-where CREATION_DATE > getdate() -7 and left(REQ_LOCATION,2) in (select ConfigValue from bluebin.Config where ConfigName = ''REQ_LOCATION'')
+where CREATION_DATE > getdate() -7 and (left(REQ_LOCATION,2) in (select ConfigValue from bluebin.Config where ConfigName = ''REQ_LOCATION'') or REQ_LOCATION in (Select REQ_LOCATION from bluebin.ALT_REQ_LOCATION))
 group by 	
 	db.[MaxSnapshotDate],
 	db.[DBUpToDate?]

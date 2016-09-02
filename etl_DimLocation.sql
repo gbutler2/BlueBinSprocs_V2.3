@@ -26,10 +26,15 @@ AS
            NAME                       AS LocationName,
            COMPANY                    AS LocationFacility,
            CASE
-             WHEN ACTIVE_STATUS = 'A' and LEFT(REQ_LOCATION, 2) IN (SELECT [ConfigValue]
+             WHEN ACTIVE_STATUS = 'A' and (
+											LEFT(REQ_LOCATION, 2) IN (SELECT [ConfigValue]
                                             FROM   [bluebin].[Config]
                                             WHERE  [ConfigName] = 'REQ_LOCATION'
-                                                   AND Active = 1) THEN 1
+                                                   AND Active = 1) 
+										or REQ_LOCATION in (Select REQ_LOCATION from bluebin.ALT_REQ_LOCATION)
+											)		   
+												   
+										THEN 1
              ELSE 0
            END                        AS BlueBinFlag,
 		   ACTIVE_STATUS
@@ -43,6 +48,4 @@ GO
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'DimLocation'
-
-
 

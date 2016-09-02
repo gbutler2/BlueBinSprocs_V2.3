@@ -6,7 +6,7 @@ GO
 
 CREATE PROCEDURE sp_EditGembaAuditNode
 @GembaAuditNodeID int,
-@Location char(10),
+@Location varchar(10),
 @AdditionalComments varchar(max),
 @PS_EmptyBins int,
 @PS_BackBins int,

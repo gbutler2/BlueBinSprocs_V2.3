@@ -16,7 +16,7 @@ BEGIN
 CREATE TABLE [gemba].[GembaAuditNode](
 	[GembaAuditNodeID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
 	[Date] datetime not null,
-	[LocationID] char(10) not null,
+	[LocationID] varchar(10) not null,
 	[AuditerUserID]  int NOT NULL,
 	[AdditionalComments] varchar(max) NULL,
     [PS_EmptyBins] int NOT NULL,

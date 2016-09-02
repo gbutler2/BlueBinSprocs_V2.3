@@ -139,6 +139,11 @@ BEGIN
 truncate table dbo.RQLOC
 END
 
+if exists (select * from sys.tables where name = 'RQLMXVAL')
+BEGIN
+truncate table dbo.RQLMXVAL
+END
+
 END
 
 GO

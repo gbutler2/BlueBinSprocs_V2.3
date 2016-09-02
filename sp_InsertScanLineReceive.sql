@@ -27,7 +27,7 @@ SET NOCOUNT ON
 
 if exists (select * from bluebin.DimItem where ItemID = @Item) 
 BEGIN
-declare @ScanMatchLocationID varchar(7) 
+declare @ScanMatchLocationID varchar(10) 
 declare @ScanMatchFacilityID int 
 declare @ScanMatchItemID varchar(32) = @Item
 declare @ScanMatchScanLineOrderID int

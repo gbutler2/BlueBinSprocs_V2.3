@@ -13,7 +13,7 @@ if not exists (select * from sys.tables where name = 'QCN')
 BEGIN
 CREATE TABLE [qcn].[QCN](
 	[QCNID] INT NOT NULL IDENTITY(1,1)  PRIMARY KEY,
-	[LocationID] char(10) not null,
+	[LocationID] varchar(10) not null,
 	[ItemID] char(32) null,
 	[RequesterUserID] varchar(65) NOT NULL,
 	[ApprovedUserID] varchar(65) NULL,

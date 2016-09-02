@@ -7,7 +7,7 @@ GO
 
 CREATE PROCEDURE sp_InsertConesDeployed
 @FacilityID int
-,@LocationID varchar (7)
+,@LocationID varchar (10)
 ,@ItemID varchar (32)
 ,@ExpectedDelivery datetime
 ,@SubProduct varchar(3)
