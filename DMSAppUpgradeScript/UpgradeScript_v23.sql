@@ -245,7 +245,7 @@ ALTER TABLE qcn.QCN ALTER COLUMN QCNCID int not null
 ALTER TABLE qcn.QCN ALTER COLUMN FacilityID int not null
 ALTER TABLE qcn.QCN ALTER COLUMN DateRequested datetime not null
 ALTER TABLE qcn.QCN ALTER COLUMN LoggedUserID int not null
-ALTER TABLE bluebin.BlueBinUser ALTER COLUMN AssignToQCN int not nullBB
+ALTER TABLE bluebin.BlueBinUser ALTER COLUMN AssignToQCN int not null
 
 select * from qcn.QCN
 
@@ -537,6 +537,12 @@ BEGIN
 update scan.ScanBatch set ScanType = 'ScanOrder' where ScanType = 'Order'
 END
 
+if not exists(select * from bluebin.Config where ConfigName = 'DefaultLeadTime')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'DefaultLeadTime','3',1,getdate(),'Tableau','Lead Time to Default to in DimBin if no LeadTime is in the ERP'
+END
+GO
 
 if not exists(select * from bluebin.Config where ConfigName = 'AutoExtractTrayScans')  
 BEGIN
@@ -6488,7 +6494,8 @@ CREATE PROCEDURE sp_InsertConesDeployed
 AS
 BEGIN
 SET NOCOUNT ON
-
+select @ExpectedDelivery = case
+							when @ExpectedDelivery < getdate() then NULL else @ExpectedDelivery end 
 
 insert into bluebin.ConesDeployed (FacilityID,LocationID,ItemID,ConeDeployed,Deployed,ConeReturned,Deleted,LastUpdated,ExpectedDelivery,SubProduct,Details) VALUES
 (@FacilityID,@LocationID,@ItemID,1,getdate(),0,0,getdate(),@ExpectedDelivery,@SubProduct,@Details) 
@@ -6499,7 +6506,6 @@ END
 GO
 grant exec on sp_InsertConesDeployed to appusers
 GO
-
 --*****************************************************
 --**************************SPROC**********************
 
@@ -6945,6 +6951,37 @@ GO
 
 --*****************************************************
 --**************************SPROC**********************
+
+IF EXISTS ( SELECT  *
+            FROM    sys.objects
+            WHERE   object_id = OBJECT_ID(N'ssp_ReqLookup')
+                    AND type IN ( N'P', N'PC' ) ) 
+
+DROP PROCEDURE  ssp_ReqLookup
+GO
+
+--exec ssp_ReqLookup '180'
+CREATE PROCEDURE ssp_ReqLookup
+@ReqNumber varchar(30)
+AS
+
+select 'REQLINE',* from REQLINE where REQ_NUMBER = @ReqNumber
+select 'ICTRANS',* from ICTRANS where DOCUMENT like '%' + @ReqNumber + '%'
+select 'POLINESRC',* from POLINESRC where SOURCE_DOC_N like '%' + @ReqNumber + '%'
+select 'POLINE',* from POLINE where PO_NUMBER in (select PO_NUMBER from POLINESRC where SOURCE_DOC_N like '%' + @ReqNumber + '%')
+select 'PORECLINE',* from PORECLINE where PO_NUMBER in (select PO_NUMBER from POLINESRC where SOURCE_DOC_N like '%' + @ReqNumber + '%')
+
+select 'FactScan',* from bluebin.FactScan where OrderNum like '%' + @ReqNumber + '%'
+
+
+GO
+
+grant exec on ssp_ReqLookup to public
+GO
+
+--*****************************************************
+--**************************SPROC**********************
+
 
 if exists (select * from dbo.sysobjects where id = object_id(N'sp_CleanLawsonTables') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
 drop procedure sp_CleanLawsonTables

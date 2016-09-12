@@ -9,7 +9,7 @@ GO
 
 --drop table bluebin.DimFacility
 --delete from bluebin.DimFacility
---select * from bluebin.DimFacility
+--select * from bluebin.DimFacility  
 --exec etl_DimFacility
 CREATE PROCEDURE etl_DimFacility
 AS
@@ -25,29 +25,29 @@ CREATE TABLE [bluebin].[DimFacility](
 ;
 
 INSERT INTO bluebin.DimFacility 
-	SELECT
-	COMPANY as FacilityID,
-	NAME as FacilityName
+	SELECT distinct
+	SETID as FacilityID,
+	SETID as FacilityName
 
-    FROM   dbo.APCOMPANY a
-	left join bluebin.DimFacility df on a.COMPANY = df.FacilityID 
+    FROM   dbo.LOCATION_TBL a
+	left join bluebin.DimFacility df on a.SETID = df.FacilityID 
 	where df.FacilityID is null
 	
 END 
 ;
 
-    INSERT INTO bluebin.DimFacility 
-	SELECT
-	COMPANY as FacilityID,
-	NAME as FacilityName
+INSERT INTO bluebin.DimFacility 
+	SELECT distinct
+	SETID as FacilityID,
+	SETID as FacilityName
 
-    FROM   dbo.APCOMPANY a
-	left join bluebin.DimFacility df on a.COMPANY = df.FacilityID 
+    FROM   dbo.LOCATION_TBL a
+	left join bluebin.DimFacility df on a.SETID = df.FacilityID 
 	where df.FacilityID is null
 ;
 update bluebin.DimFacility set FacilityName = a.fn from
-(select COMPANY as fi,NAME as fn from APCOMPANY) as a
-where FacilityID = a.fi and FacilityName <> a.fn
+(select SETID as fi,SETID as fn from dbo.LOCATION_TBL) as a
+where FacilityID = a.fi and FacilityName COLLATE DATABASE_DEFAULT <> a.fn
 ;
 
 UPDATE etl.JobSteps

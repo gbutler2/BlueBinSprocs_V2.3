@@ -114,7 +114,7 @@ SELECT Row_number()
            UOM                                                                                        AS BinUOM,
            REORDER_POINT                                                                              AS BinQty,
            CASE
-             WHEN LEADTIME_DAYS = 0 THEN 3
+             WHEN LEADTIME_DAYS = 0 or LEADTIME_DAYS is null THEN (Select max(ConfigValue) from bluebin.Config where ConfigName = 'DefaultLeadTime')
              ELSE LEADTIME_DAYS
            END                                                                                        AS BinLeadTime,
            #BinAddDates.BinAddedDate                                                                  AS BinGoLiveDate,

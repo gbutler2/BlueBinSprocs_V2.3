@@ -18,7 +18,8 @@ CREATE PROCEDURE sp_InsertConesDeployed
 AS
 BEGIN
 SET NOCOUNT ON
-
+select @ExpectedDelivery = case
+							when @ExpectedDelivery < getdate() then NULL else @ExpectedDelivery end 
 
 insert into bluebin.ConesDeployed (FacilityID,LocationID,ItemID,ConeDeployed,Deployed,ConeReturned,Deleted,LastUpdated,ExpectedDelivery,SubProduct,Details) VALUES
 (@FacilityID,@LocationID,@ItemID,1,getdate(),0,0,getdate(),@ExpectedDelivery,@SubProduct,@Details) 

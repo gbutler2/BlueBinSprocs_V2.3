@@ -140,24 +140,15 @@ FROM   POVAGRMTLN a
 				  AND a.LINE_NBR = b.LINE_NBR
 WHERE  a.HOLD_FLAG = 'N'  
 
---**Old Vendors
---select distinct a.ITEM,a.VENDOR
---into #ItemVendor
---from ITEMSRC a
---where a.REPLENISH_PRI = 1
---        AND a.LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
---		and a.REPL_FROM_LOC = '' 
 
 select distinct a.ITEM,a.VENDOR
 into #ItemVendor
-from 
-	(select ITEM,max(VENDOR) as VENDOR
-		from ITEMSRC 
-		where REPLENISH_PRI = 1
-				AND LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
-				and REPL_FROM_LOC = ''
-		group by ITEM) a
-
+from ITEMSRC a
+where a.REPLENISH_PRI = 1
+        AND a.LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
+		and a.REPL_FROM_LOC = ''
+		and ITEM = '142132' 
+		and COMPANY not in (select distinct FacilityID from tableau.Kanban)
 
 
 /*********************		CREATE DimItem		**************************************/

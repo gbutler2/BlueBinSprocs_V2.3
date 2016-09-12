@@ -104,7 +104,7 @@ FROM   POLINESRC a
                ON a.PO_NUMBER = b.PO_NUMBER
                   AND a.LINE_NBR = b.PO_LINE_NBR
 					AND a.COMPANY = b.COMPANY 
---and a.SOURCE_DOC_N like '%603585%'
+
 
 GROUP BY
 	a.COMPANY,
@@ -160,7 +160,7 @@ Row_number()
          ELSE NULL
        END                           AS OrderCloseDate,
 	   case 
-	   when a.CLOSED_FL = 'Y' and c.REQ_NUMBER is null and a.ITEM_TYPE = 'N' then a.CREATION_DATE
+	   when a.CLOSED_FL = 'Y' and ((c.REQ_NUMBER is null and a.ITEM_TYPE = 'N') or (e.DOCUMENT is null and e.TRANS_DATE is null and a.ITEM_TYPE = 'I')) then a.CREATION_DATE
 	   else d.CancelDate end as OrderCancelDate
 INTO   #tmpScan  
 FROM   #REQLINE a
@@ -198,7 +198,7 @@ SELECT a.Scanseq,
        a.OrderUOM,
        Cast(a.OrderQty AS INT) AS OrderQty,
        a.OrderDate,
-       case when a.OrderCancelDate is not null and a.ItemType <> 'I' then a.OrderCancelDate else a.OrderCloseDate end as OrderCloseDate,
+       case when (a.OrderCancelDate is not null and a.ItemType <> 'I') or (a.OrderCancelDate is not null and a.ItemType = 'I') then a.OrderCancelDate else a.OrderCloseDate end as OrderCloseDate,
        b.OrderDate             AS PrevOrderDate,
        case when b.OrderCancelDate is not null  and a.ItemType <> 'I' then b.OrderCancelDate else b.OrderCloseDate end AS PrevOrderCloseDate,
        1                       AS Scan,
@@ -221,7 +221,7 @@ FROM   #tmpScan a
 			  AND a.OrderFacility = c.LocationFacility		
        LEFT JOIN bluebin.DimItem d
               ON a.ItemID = d.ItemID 
---where a.OrderNum like '%598486%'
+--where a.OrderNum like '%606841%'
 order by a.BinKey,a.OrderDate
 /*****************************************		DROP Temp Tables		*******************************/
 
@@ -230,6 +230,8 @@ DROP TABLE #ICTRANS
 DROP TABLE #POLINE
 DROP TABLE #tmpScan
 DROP TABLE #CancelledLines
+
+
 
 GO
 

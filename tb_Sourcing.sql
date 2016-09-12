@@ -153,7 +153,7 @@ FROM   #tmpPOLines a
        LEFT JOIN #tmpMMDist b
               ON a.PO_NUMBER = b.PO_NUMBER
                  AND a.LINE_NBR = b.LINE_NBR 
-		LEFT JOIN BUYER c
+		LEFT JOIN (select distinct BUYER_CODE,NAME from BUYER) c
 		ON a.BUYER_CODE = c.BUYER_CODE
 		LEFT JOIN APVENMAST d ON a.VENDOR = d.VENDOR
 

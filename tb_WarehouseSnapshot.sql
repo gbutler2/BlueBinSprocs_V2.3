@@ -24,6 +24,7 @@ GROUP BY
 	SnapshotDate,
 	FacilityName,
 	LocationID 
+;
 
 
 END

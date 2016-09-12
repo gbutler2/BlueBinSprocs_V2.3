@@ -22,137 +22,55 @@ END CATCH
 
 --/***************************		CREATE Temp Tables		*************************/
 
-SELECT REQ_LOCATION,
-       Min(CREATION_DATE) AS BinAddedDate
-INTO   #BinAddDates
-FROM   REQLINE a INNER JOIN bluebin.DimLocation b ON a.REQ_LOCATION = b.LocationID
-WHERE  b.BlueBinFlag = 1
-GROUP  BY REQ_LOCATION
-
-SELECT Row_number()
-         OVER(
-           Partition BY ITEM, ENTERED_UOM
-           ORDER BY CREATION_DATE DESC) AS Itemreqseq,
-       ITEM,
-       ENTERED_UOM,
-       UNIT_COST
-INTO   #ItemReqs
-FROM   REQLINE a INNER JOIN bluebin.DimLocation b ON a.REQ_LOCATION = b.LocationID
-WHERE  b.BlueBinFlag = 1
-
-SELECT Row_number()
-         OVER(
-           Partition BY ITEM, ENT_BUY_UOM
-           ORDER BY PO_NUMBER DESC) AS ItemOrderSeq,
-       ITEM,
-       ENT_BUY_UOM,
-       ENT_UNIT_CST
-INTO   #ItemOrders
-FROM   POLINE
-WHERE  ITEM_TYPE IN ( 'I', 'N' )
-       AND ITEM IN (SELECT DISTINCT ITEM
-                    FROM   ITEMLOC a INNER JOIN bluebin.DimLocation b ON a.LOCATION = b.LocationID
-WHERE  b.BlueBinFlag = 1)
-
-
-SELECT distinct a.ITEM,
-       --a.GL_CATEGORY,
-       max(b.ISS_ACCOUNT) as ISS_ACCOUNT--,a.LOCATION
-INTO   #ItemAccounts
-FROM   ITEMLOC a 
-		LEFT JOIN ICCATEGORY b
-              ON a.GL_CATEGORY = b.GL_CATEGORY
-                 AND a.LOCATION = b.LOCATION
-WHERE  
-a.LOCATION in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION') 
-and a.ACTIVE_STATUS = 'A' --and a.ITEM = '3733'
-group by a.ITEM
-       --,a.GL_CATEGORY
-
-
-
-
-SELECT distinct 
-i.ITEM,
-c.LAST_ISS_COST
-INTO   #ItemStore
-FROM   ITEMLOC i
-left join (select ITEMLOC.ITEM,max(ITEMLOC.LAST_ISS_COST) as LAST_ISS_COST from ITEMLOC
-				inner join (select ITEM,max(LAST_ISSUE_DT) as t from ITEMLOC where ITEM = '1915' group by ITEM) cost on ITEMLOC.ITEM = cost.ITEM and ITEMLOC.LAST_ISSUE_DT = cost.t
-				group by ITEMLOC.ITEM ) c on i.ITEM = c.ITEM
-WHERE  i.LOCATION in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')  and i.ACTIVE_STATUS = 'A'  
-
-
-SELECT distinct ITEM,CONSIGNMENT_FL 
-INTO #Consignment
-FROM ITEMMAST
-WHERE  ITEM in (select ITEM from ITEMLOC where LOCATION in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION'))
-
-
 
 /***********************************		CREATE	DimBin		***********************************/
-
 SELECT Row_number()
-             OVER(
-               ORDER BY ITEMLOC.LOCATION, ITEMLOC.ITEM)                                               AS BinKey,
-			   ITEMLOC.COMPANY																			AS BinFacility,
-           ITEMLOC.ITEM                                                                               AS ItemID,
-           ITEMLOC.LOCATION                                                                           AS LocationID,
-           PREFER_BIN                                                                                 AS BinSequence,
-		   	CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN LEFT(PREFER_BIN, 2) ELSE LEFT(PREFER_BIN, 1) END as BinCart,
-			CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN SUBSTRING(PREFER_BIN, 3, 1) ELSE SUBSTRING(PREFER_BIN, 2,1) END as BinRow,
-			CASE WHEN PREFER_BIN LIKE '[A-Z][A-Z]%' THEN SUBSTRING (PREFER_BIN,4,2) ELSE SUBSTRING(PREFER_BIN, 3,2) END as BinPosition,
+         OVER(
+           ORDER BY Bins.INV_CART_ID, Bins.INV_ITEM_ID) AS BinKey,
+       --Bins.INV_CART_ID                                 AS CartID,
+	   ''												as BinFacility,
+       Bins.INV_ITEM_ID                                 AS ItemID,
+       Locations.LOCATION                               AS LocationID,
+       Bins.COMPARTMENT                                 AS BinSequence,
+		   	CASE WHEN Bins.COMPARTMENT LIKE '[A-Z][A-Z]%' THEN LEFT(Bins.COMPARTMENT, 2) ELSE LEFT(Bins.COMPARTMENT, 1) END as BinCart,
+			CASE WHEN Bins.COMPARTMENT LIKE '[A-Z][A-Z]%' THEN SUBSTRING(Bins.COMPARTMENT, 3, 1) ELSE SUBSTRING(Bins.COMPARTMENT, 2,1) END as BinRow,
+			CASE WHEN Bins.COMPARTMENT LIKE '[A-Z][A-Z]%' THEN SUBSTRING (Bins.COMPARTMENT,4,2) ELSE SUBSTRING(Bins.COMPARTMENT, 3,2) END as BinPosition,
            CASE
-             WHEN PREFER_BIN LIKE 'CARD%' THEN 'WALL'
-             ELSE RIGHT(PREFER_BIN, 3)
-           END                                                                                        AS BinSize,
-           UOM                                                                                        AS BinUOM,
-           REORDER_POINT                                                                              AS BinQty,
-           CASE
-             WHEN LEADTIME_DAYS = 0 THEN 3
-             ELSE LEADTIME_DAYS
-           END                                                                                        AS BinLeadTime,
-           #BinAddDates.BinAddedDate                                                                  AS BinGoLiveDate,
-           COALESCE(COALESCE(#ItemReqs.UNIT_COST, #ItemOrders.ENT_UNIT_CST), #ItemStore.LAST_ISS_COST) AS BinCurrentCost,
-           CASE
-             WHEN ltrim(rtrim(ITEMLOC.USER_FIELD1)) = 'Consignment' THEN 'Y'
-			 WHEN UPPER(ltrim(rtrim(ITEMLOC.USER_FIELD1))) = 'CONSIGNMENT' OR #Consignment.CONSIGNMENT_FL = 'Y'  THEN 'Y'
-             ELSE 'N'
-           END                                                                                        AS BinConsignmentFlag,
-           #ItemAccounts.ISS_ACCOUNT                                                                  AS BinGLAccount,
-		   'Awaiting Updated Status'																							AS BinCurrentStatus
-    INTO   bluebin.DimBin
-    FROM   ITEMLOC  
-           INNER JOIN bluebin.DimLocation
-                   ON ITEMLOC.LOCATION = DimLocation.LocationID
-				   AND ITEMLOC.COMPANY = DimLocation.LocationFacility			   
-           INNER JOIN #BinAddDates
-                   ON ITEMLOC.LOCATION = #BinAddDates.REQ_LOCATION
-           LEFT JOIN #ItemReqs
-                  ON ITEMLOC.ITEM = #ItemReqs.ITEM
-                     AND ITEMLOC.UOM = #ItemReqs.ENTERED_UOM
-                     AND #ItemReqs.Itemreqseq = 1
-           LEFT JOIN #ItemOrders
-                  ON ITEMLOC.ITEM = #ItemOrders.ITEM
-                     AND ITEMLOC.UOM = #ItemOrders.ENT_BUY_UOM
-                     AND #ItemOrders.ItemOrderSeq = 1
-           LEFT JOIN #ItemAccounts
-                  ON ITEMLOC.ITEM = #ItemAccounts.ITEM
-           LEFT JOIN #ItemStore
-                  ON ITEMLOC.ITEM = #ItemStore.ITEM
-		   LEFT JOIN #Consignment
-                  ON ITEMLOC.ITEM = #Consignment.ITEM
-	WHERE DimLocation.BlueBinFlag = 1
-	--and ITEMLOC.ITEM = '1915'
+             WHEN Bins.COMPARTMENT LIKE 'CARD%' THEN 'WALL'
+             ELSE RIGHT(Bins.COMPARTMENT, 3)
+           END                                           AS BinSize,
+       Bins.UNIT_OF_MEASURE                             AS BinUOM,
+       Cast(Bins.QTY_OPTIMAL AS INT)                    AS BinQty,
+       (Select max(ConfigValue) from bluebin.Config where ConfigName = 'DefaultLeadTime')         AS BinLeadTime,
+	   Locations.EFFDT									AS BinGoLiveDate,
+	   '' AS BinCurrentCost,
+       '' AS BinConsignmentFlag,
+       '' AS BinGLAccount,
+	   'Awaiting Updated Status'						 AS BinCurrentStatus
+
+
+--INTO   bluebin.DimBin
+FROM   dbo.CART_TEMPL_INV Bins
+	   --INNER JOIN bluebin.DimLocation dl
+    --               ON Bins.LOCATION COLLATE DATABASE_DEFAULT = dl.LocationID
+				   --AND ITEMLOC.COMPANY = dl.LocationFacility
+       LEFT JOIN dbo.CART_ATTRIB_INV Carts
+              ON Bins.INV_CART_ID COLLATE DATABASE_DEFAULT = Carts.INV_CART_ID
+       LEFT JOIN dbo.LOCATION_TBL Locations
+              ON Carts.LOCATION COLLATE DATABASE_DEFAULT = Locations.LOCATION
+	   INNER JOIN bluebin.DimLocation dl
+              ON Locations.LOCATION COLLATE DATABASE_DEFAULT = dl.LocationID
+WHERE  
+		dl.BlueBinFlag = 1
+		and
+		(LEFT(Carts.LOCATION, 2) COLLATE DATABASE_DEFAULT IN (SELECT [ConfigValue] FROM   [bluebin].[Config] WHERE  [ConfigName] = 'REQ_LOCATION' AND Active = 1) 
+		or Carts.LOCATION COLLATE DATABASE_DEFAULT in (Select REQ_LOCATION from bluebin.ALT_REQ_LOCATION))
+
+
+
 
 /*****************************************		DROP Temp Tables	**************************************/
 
-DROP TABLE #BinAddDates
-DROP TABLE #ItemReqs
-DROP TABLE #ItemOrders
-DROP TABLE #ItemAccounts
-DROP TABLE #ItemStore
-DROP TABLE #Consignment
 
 GO
 

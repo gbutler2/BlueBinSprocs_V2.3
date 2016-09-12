@@ -8,7 +8,6 @@ CREATE PROCEDURE [dbo].[etl_DimBinHistory]
 	
 AS
 
-
 /*
 select * from bluebin.DimBinHistory where LastSequence = 'N/A' order by FacilityID,LocationID,ItemID,Date
 select * from bluebin.DimBin where LocationID = 'B6183' and ItemID = '700'  
@@ -32,22 +31,11 @@ if not exists (select * from bluebin.DimBinHistory where [Date] = convert(Date,g
 BEGIN
 
 insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
-select convert(Date,getdate()-1),db.BinKey,db.BinFacility,db.LocationID,db.ItemID,convert(int,db.BinQty),db.BinUOM,db.BinSequence,ISNULL(dbh.BinQty,0),ISNULL(dbh.LastBinUOM,'N/A'),ISNULL(dbh.LastSequence,'N/A')
+select convert(Date,getdate()-1),db.BinKey,db.BinFacility,db.LocationID,db.ItemID,convert(int,db.BinQty),db.BinUOM,db.BinSequence,ISNULL(dbh.BinQty,0),ISNULL(dbh.BinUOM,'N/A'),ISNULL(dbh.Sequence,'N/A')
 from bluebin.DimBin db
 left join bluebin.DimBinHistory dbh on db.BinFacility = dbh.FacilityID and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and dbh.[Date] = convert(Date,getdate()-2)
 END
 
-
---if exists (select * from bluebin.DimBinHistory where [Date] = convert(Date,getdate()))
---BEGIN
---delete from bluebin.DimBinHistory where [Date] = convert(Date,getdate())
---END
-
-
---insert into bluebin.DimBinHistory ([Date],BinKey,FacilityID,LocationID,ItemID,BinQty,BinUOM,[Sequence],LastBinQty,LastBinUOM,[LastSequence]) 
---select convert(Date,getdate()),db.BinKey,db.BinFacility,db.LocationID,db.ItemID,convert(int,db.BinQty),db.BinUOM,db.BinSequence,ISNULL(dbh.BinQty,0),ISNULL(dbh.LastBinUOM,'N/A'),ISNULL(dbh.LastSequence,'N/A')
---from bluebin.DimBin db
---left join bluebin.DimBinHistory dbh on db.BinFacility = dbh.FacilityID and db.LocationID = dbh.LocationID and db.ItemID = dbh.ItemID and dbh.[Date] = convert(Date,getdate()-1)
 
 
 GO
