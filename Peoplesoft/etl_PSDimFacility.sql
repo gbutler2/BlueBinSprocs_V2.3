@@ -1,3 +1,8 @@
+/********************************************************************
+
+					DimFacility
+
+********************************************************************/
 
 IF EXISTS ( SELECT  *
             FROM    sys.objects
@@ -8,8 +13,8 @@ DROP PROCEDURE  etl_DimFacility
 GO
 
 --drop table bluebin.DimFacility
---delete from bluebin.DimFacility
---select * from bluebin.DimFacility
+--delete from bluebin.DimFacility where FacilityID = 2
+--select * from bluebin.DimFacility  
 --exec etl_DimFacility
 CREATE PROCEDURE etl_DimFacility
 AS
@@ -23,32 +28,21 @@ CREATE TABLE [bluebin].[DimFacility](
 	[FacilityName] varchar (50) NOT NULL
 )
 ;
+declare @DefaultFacility int = (select ConfigValue from bluebin.Config where ConfigName = 'PS_DefaultFacility')
 
+if exists (select ConfigValue from bluebin.Config where ConfigName = 'PS_DefaultFacility' and ConfigValue > 0)
+BEGIN
 INSERT INTO bluebin.DimFacility 
-	SELECT
-	COMPANY as FacilityID,
-	NAME as FacilityName
+--declare @DefaultFacility int = (select ConfigValue from bluebin.Config where ConfigName = 'PS_DefaultFacility')
 
-    FROM   dbo.APCOMPANY a
-	left join bluebin.DimFacility df on a.COMPANY = df.FacilityID 
-	where df.FacilityID is null
+select @DefaultFacility,a.SETID
+from
+	(select distinct SETID from LOCATION_TBL) a
+	where @DefaultFacility not in (select FacilityID from bluebin.DimFacility)
 	
 END 
-;
-
-    INSERT INTO bluebin.DimFacility 
-	SELECT
-	COMPANY as FacilityID,
-	NAME as FacilityName
-
-    FROM   dbo.APCOMPANY a
-	left join bluebin.DimFacility df on a.COMPANY = df.FacilityID 
-	where df.FacilityID is null
-;
-update bluebin.DimFacility set FacilityName = a.fn from
-(select COMPANY as fi,NAME as fn from APCOMPANY) as a
-where FacilityID = a.fi and FacilityName <> a.fn
-;
+END
+GO
 
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()

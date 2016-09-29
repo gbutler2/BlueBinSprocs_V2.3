@@ -27,18 +27,11 @@ SELECT
        a.UnitCost,
 	   c.LastPODate,
 	   a.StockUOM as UOM
-       ,Sum(CASE
-             WHEN TRANS_DATE >= Dateadd(YEAR, Datediff(YEAR, 0, Dateadd(YEAR, -1, Getdate())), 0)
-                  AND TRANS_DATE <= Dateadd(YEAR, -1, Getdate()) THEN b.QUANTITY * -1
-             ELSE 0
-           END) / Month(Getdate()) AS LYYTDIssueQty,
-       Sum(CASE
-             WHEN TRANS_DATE >= Dateadd(YEAR, Datediff(YEAR, 0, Getdate()), 0) THEN b.QUANTITY * -1
-             ELSE 0
-           END) / Month(Getdate()) AS CYYTDIssueQty
+       ,'' AS LYYTDIssueQty,
+       '' AS CYYTDIssueQty
 FROM   bluebin.DimWarehouseItem a
-       LEFT JOIN ICTRANS b
-               ON ltrim(rtrim(a.ItemID)) = ltrim(rtrim(ITEM)) 
+       --LEFT JOIN ICTRANS b
+       --        ON ltrim(rtrim(a.ItemID)) = ltrim(rtrim(ITEM)) 
 		LEFT JOIN bluebin.DimItem c
 			   ON a.ItemKey = c.ItemKey
 WHERE  SOHQty > 0 --b.DOC_TYPE = 'IS' and Year(b.TRANS_DATE) >= Year(Getdate()) - 1

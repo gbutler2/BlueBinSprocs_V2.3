@@ -11,13 +11,12 @@ SET NOCOUNT ON
 SELECT 
 df.FacilityName,
 fi.LocationID,
-fi.BlueBinFlag,
 Cast(fi.IssueDate AS DATE) AS Date,
 Count(*) AS PickLine
 FROM   bluebin.FactIssue fi
 inner join bluebin.DimFacility df on fi.ShipFacilityKey = df.FacilityID
 --WHERE fi.IssueDate > getdate() -15 and fi.LocationID in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
-GROUP  BY df.FacilityName,fi.LocationID,fi.BlueBinFlag,Cast(fi.IssueDate AS DATE)
+GROUP  BY df.FacilityName,fi.LocationID,Cast(fi.IssueDate AS DATE)
 order by 1,2,3 
 
 

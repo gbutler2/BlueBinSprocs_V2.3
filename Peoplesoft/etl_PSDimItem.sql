@@ -13,7 +13,7 @@ IF EXISTS ( SELECT  *
 DROP PROCEDURE  etl_DimItem
 GO
 
-
+--exec etl_DimItem
 CREATE PROCEDURE etl_DimItem
 
 AS
@@ -57,7 +57,7 @@ SELECT Row_number()
 	   UNIT_MEASURE_STD			   AS StockUOM,
        UNIT_MEASURE_STD            AS BuyUOM,
        ''							AS PackageString--****
-INTO   DimItem
+INTO   bluebin.DimItem
 FROM   dbo.MASTER_ITEM_TBL a
        LEFT JOIN dbo.ITEM_MFG b
               ON a.INV_ITEM_ID COLLATE DATABASE_DEFAULT = b.INV_ITEM_ID

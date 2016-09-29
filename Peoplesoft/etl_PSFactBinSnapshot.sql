@@ -5,7 +5,7 @@ IF EXISTS ( SELECT  *
 
 DROP PROCEDURE  etl_FactBinSnapshot
 GO
-
+--exec etl_FactBinSnapshot
 
 CREATE PROCEDURE  etl_FactBinSnapshot
 
@@ -78,6 +78,7 @@ WHERE  BinGoLiveDate <= Date
 SELECT DISTINCT BinKey
 INTO #tmpScannedBins
 FROM   bluebin.FactScan
+where ScanHistseq > (select ConfigValue from bluebin.Config where ConfigName = 'ScanThreshold')
 
 
 /***********************************		CREATE FactBinSnapshot		*******************************************/
@@ -103,7 +104,7 @@ SELECT #tmpBinDates.BinKey,
 	    WHEN #tmpScannedBins.BinKey IS NULL AND COALESCE(DaysSinceLastScan, Datediff(Day, #tmpBinDates.BinGoLiveDate, #tmpBinDates.Date)) < 90  THEN 6
 		WHEN COALESCE(DaysSinceLastScan, Datediff(Day, #tmpBinDates.BinGoLiveDate, #tmpBinDates.Date)) >= @StaleBinDays THEN 5
 		WHEN COALESCE(DaysSinceLastScan, Datediff(Day, #tmpBinDates.BinGoLiveDate, #tmpBinDates.Date)) BETWEEN @SlowBinDays AND @StaleBinDays THEN 4
-		WHEN COALESCE(DaysSinceLastScan, Datediff(Day, #tmpBinDates.BinGoLiveDate, #tmpBinDates.Date)) < 90 AND BinVelocity >= 1.25 THEN 3
+		WHEN (COALESCE(DaysSinceLastScan, Datediff(Day, #tmpBinDates.BinGoLiveDate, #tmpBinDates.Date)) < 90 AND BinVelocity >= 1.25) OR #ThresholdScans.BinLeadTime > 10 THEN 3
 		WHEN COALESCE(DaysSinceLastScan, Datediff(Day, #tmpBinDates.BinGoLiveDate, #tmpBinDates.Date)) < 90 AND BinVelocity BETWEEN .75 AND 1.25 THEN 2
 		WHEN COALESCE(DaysSinceLastScan, Datediff(Day, #tmpBinDates.BinGoLiveDate, #tmpBinDates.Date)) < 90 AND BinVelocity < .75 THEN 1
 		ELSE 0 END																	AS BinStatusKey		
@@ -138,3 +139,5 @@ GO
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'FactBinSnapshot'
+
+GO

@@ -1,3 +1,8 @@
+/********************************************************************
+
+					DimLocation
+
+********************************************************************/
 IF EXISTS ( SELECT  *
             FROM    sys.objects
             WHERE   object_id = OBJECT_ID(N'etl_DimLocation')
@@ -5,7 +10,8 @@ IF EXISTS ( SELECT  *
 
 DROP PROCEDURE  etl_DimLocation
 GO
-
+--exec etl_DimLocation
+--select * from bluebin.DimLocation where BlueBinFlag = 1
 
 CREATE PROCEDURE etl_DimLocation
 AS
@@ -19,12 +25,16 @@ AS
   END CATCH
 
 /*********************		CREATE DimLocation	****************************/
+   declare @Facility int
+   select @Facility = ConfigValue from bluebin.Config where ConfigName = 'PS_DefaultFacility'
+   
+   
    SELECT Row_number()
          OVER(
            ORDER BY a.LOCATION) AS LocationKey,
        a.LOCATION            AS LocationID,
        UPPER(DESCR)          AS LocationName,
-	   df.FacilityID		 AS LocationFacility,
+	   case when @Facility is not null or @Facility <> '' then @Facility else df.FacilityID	end AS LocationFacility,
 		CASE
              WHEN a.EFF_STATUS = 'A' and (
 											LEFT(a.LOCATION, 2) COLLATE DATABASE_DEFAULT IN (SELECT [ConfigValue] 
@@ -51,4 +61,5 @@ UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'DimLocation'
 
+GO
 

@@ -17,6 +17,7 @@ SELECT
 	,a.FacilityID
 	,rtrim(a.ItemID) as ItemID
 	,a.ClinicalDescription
+	,a.[Sequence]
 	,RequesterUserID as RequesterUser
 	,ApprovedBy
 	,a.[AssignedUserID] as AssignedUser

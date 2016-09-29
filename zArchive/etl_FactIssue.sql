@@ -1,9 +1,3 @@
-/*********************************************************************
-
-		FactIssue
-
-*********************************************************************/
-
 IF EXISTS ( SELECT  *
             FROM    sys.objects
             WHERE   object_id = OBJECT_ID(N'etl_FactIssue')
@@ -26,14 +20,13 @@ AS
  /*******************************	CREATE FactIssue	*********************************/
 
 
- SELECT 
-		a.COMPANY                                                                                AS FacilityKey,
+ SELECT COMPANY                                                                                AS FacilityKey,
+       
        a.LOCATION as LocationID,
 	   b.LocationKey,
 	   c.LocationKey                                                                          AS ShipLocationKey,
        c.LocationFacility                                                                     AS ShipFacilityKey,
-       c.BlueBinFlag,
-	  d.ItemKey,
+       d.ItemKey,
        SYSTEM_CD as SourceSystem,
        CASE
          WHEN SYSTEM_CD = 'RQ' THEN DOCUMENT
@@ -55,7 +48,7 @@ AS
          ELSE 0
        END                                                                                    AS StatCall,
        1                                                                                      AS IssueCount
-INTO bluebin.FactIssue
+--INTO bluebin.FactIssue
 FROM   ICTRANS a
        LEFT JOIN bluebin.DimLocation b
                ON a.LOCATION = b.LocationID
@@ -65,12 +58,10 @@ FROM   ICTRANS a
                   AND a.FROM_TO_CMPY = c.LocationFacility
        LEFT JOIN bluebin.DimItem d
                ON a.ITEM = d.ItemID
-WHERE  DOC_TYPE = 'IS'  and a.DOCUMENT not like '%[A-Z]%' --and c.BlueBinFlag = 1
+WHERE  DOC_TYPE = 'IS'  and a.DOCUMENT not like '%[A-Z]%' 
 
 GO
 
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'FactIssue'
-
-GO

@@ -1,3 +1,9 @@
+/***********************************************************
+
+			DimDate
+
+***********************************************************/
+
 IF EXISTS ( SELECT  *
             FROM    sys.objects
             WHERE   object_id = OBJECT_ID(N'etl_DimDate')
@@ -5,7 +11,7 @@ IF EXISTS ( SELECT  *
 
 DROP PROCEDURE  etl_DimDate
 GO
-
+--exec etl_DimDate
 CREATE PROCEDURE etl_DimDate
 AS
   BEGIN TRY
@@ -81,3 +87,5 @@ GO
 	  UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'DimDate'
+
+GO

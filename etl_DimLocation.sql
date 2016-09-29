@@ -22,7 +22,7 @@ AS
    SELECT Row_number()
              OVER(
                ORDER BY REQ_LOCATION) AS LocationKey,
-           REQ_LOCATION               AS LocationID,
+           REQ_LOCATION              AS LocationID,
            NAME                       AS LocationName,
            COMPANY                    AS LocationFacility,
            CASE
@@ -39,8 +39,11 @@ AS
            END                        AS BlueBinFlag,
 		   ACTIVE_STATUS
     INTO   bluebin.DimLocation
-    FROM   RQLOC 
-
+    FROM   
+		(
+		select distinct REQ_LOCATION,NAME,COMPANY,ACTIVE_STATUS FROM RQLOC
+		) a 
+	--where REQ_LOCATION like 'BB%'
 
 
 GO

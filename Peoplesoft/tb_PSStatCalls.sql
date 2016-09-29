@@ -2,32 +2,41 @@ if exists (select * from dbo.sysobjects where id = object_id(N'tb_StatCalls') an
 drop procedure tb_StatCalls
 GO
 
+
+--exec tb_StatCalls
 CREATE PROCEDURE tb_StatCalls
 AS
 BEGIN
 SET NOCOUNT ON
 
+declare @Facility int
+   select @Facility = ConfigValue from bluebin.Config where ConfigName = 'PS_DefaultFacility'
 
-SELECT
-    a.FROM_TO_CMPY,
-	df.FacilityName,
-	TRANS_DATE as Date,
-    COUNT(*) as StatCalls,
-    LTRIM(RTRIM(c.ACCT_UNIT)) + ' - '+ c.DESCRIPTION       as Department
-FROM
-    ICTRANS a 
-INNER JOIN
-RQLOC b ON a.FROM_TO_CMPY = b.COMPANY AND a.FROM_TO_LOC = b.REQ_LOCATION
-INNER JOIN
-GLNAMES c ON b.COMPANY = c.COMPANY AND b.ISS_ACCT_UNIT = c.ACCT_UNIT
-INNER JOIN bluebin.DimFacility df on a.FROM_TO_CMPY = df.FacilityID
-WHERE SYSTEM_CD = 'IC' AND DOC_TYPE = 'IS'
+SELECT 
+case when @Facility is not null or @Facility <> '' then @Facility else ''end as FROM_TO_CMPY,
+case when @Facility is not null or @Facility <> '' then (select FacilityName from bluebin.DimFacility where FacilityID = @Facility) else ''end as FacilityName,
+lt.LOCATION as LocationID,
+lt.DESCR as LocationName,
+ISNULL(dl.BlueBinFlag,0) as BlueBinFlag,
+DEMAND_DATE       AS [Date],
+COUNT(*) as StatCalls,
+'' as Department
+
+FROM   dbo.IN_DEMAND
+       INNER JOIN dbo.LOCATION_TBL lt on IN_DEMAND.LOCATION = lt.LOCATION
+	   LEFT JOIN bluebin.DimLocation dl ON lt.LOCATION = dl.LocationID
+
+WHERE  PICK_BATCH_ID = 0
+       AND BUSINESS_UNIT in (Select ConfigValue from bluebin.Config where ConfigName = 'PS_BUSINESSUNIT')
+	   AND (IN_FULFILL_STATE in (select ConfigValue from bluebin.Config where ConfigName = 'PS_InFulfillState') or IN_FULFILL_STATE is null)
 GROUP BY
-    a.FROM_TO_CMPY,
-	df.FacilityName,
-	TRANS_DATE,
-    c.ACCT_UNIT,
-    c.DESCRIPTION
+--DimLocation.LocationID,
+--DimLocation.LocationName,
+lt.LOCATION,
+lt.DESCR,
+dl.BlueBinFlag,
+DEMAND_DATE
+Order by DEMAND_DATE
 
 
 END

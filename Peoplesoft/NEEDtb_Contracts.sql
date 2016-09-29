@@ -1,12 +1,3 @@
-/*******************************************************************************
-
-
-			Contracts
-
-
-*******************************************************************************/
-
-
 IF EXISTS ( SELECT  *
             FROM    sys.objects
             WHERE   object_id = OBJECT_ID(N'tb_Contracts')
@@ -41,7 +32,7 @@ SELECT Date,
        HOLD_FLAG     AS HoldFlag,
        EFFECTIVE_DT  AS EffectiveDate,
        EXPIRE_DT     AS ExpireDate
-INTO   tableau.Contracts
+--INTO   tableau.Contracts
 FROM   bluebin.DimDate
        LEFT JOIN POVAGRMTLN a
               ON EXPIRE_DT = Date 

@@ -1,86 +1,96 @@
-IF EXISTS ( SELECT  *
-            FROM    sys.objects
-            WHERE   object_id = OBJECT_ID(N'tb_TodaysOrders')
-                    AND type IN ( N'P', N'PC' ) ) 
-
-DROP PROCEDURE  tb_TodaysOrders
+USE [OSUMC]
 GO
 
-CREATE PROCEDURE	tb_TodaysOrders
+/****** Object:  StoredProcedure [dbo].[tb_TodaysOrders]    Script Date: 9/26/2016 1:16:02 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+CREATE PROCEDURE	[dbo].[tb_TodaysOrders]
 --exec tb_TodaysOrders  
 AS
 
 SET NOCOUNT on
 ;
+
+DECLARE @EndDateConfig varchar(20), @TodayDate Datetime
+	select @EndDateConfig = ConfigValue from bluebin.Config where ConfigName = 'ReportDateEnd'
+	select @TodayDate = case when @EndDateConfig = 'Current' then getdate() -1 else convert(date,getdate()-1,112) end
+;	
+
 With list as 
 (
 			select distinct
-			rq.COMPANY,
-			rq.REQ_LOCATION,
+			db.BinFacility as COMPANY,
+			db.LocationID as REQ_LOCATION,
 			dl.LocationName
-			from REQLINE rq
-			inner join bluebin.DimBin db on rq.COMPANY = db.BinFacility and rq.REQ_LOCATION = db.LocationID and rq.ITEM = db.ItemID 
+			from bluebin.FactScan fs
+			inner join bluebin.DimBin db on fs.BinKey = db.BinKey
 			inner join bluebin.DimLocation dl on db.LocationID = dl.LocationID and dl.BlueBinFlag = 1
-			inner join REQHEADER rh on rq.REQ_NUMBER = rh.REQ_NUMBER
-			where rq.CREATION_DATE > getdate() -3  and rq.STATUS =9  and rq.KILL_QUANTITY = 0 
+			where fs.OrderDate > getdate() -32
 			)
 
 
 select 
 convert(datetime,(convert(DATE,getdate()-1)),112) as CREATION_DATE,
 [list].COMPANY,
+df.FacilityName as FacilityName,
 [list].REQ_LOCATION,
 [list].LocationName,
 ISNULL([current].Lines,0) as TodayLines,
-ISNULL([past].Lines,0) as YestLines,
+--ISNULL([past].Lines,0) as YestLines,
+--CAST([past].Lines as decimal(6,2))/30,
+--ROUND(CAST([past].Lines as decimal(6,2))/30,0),
+CAST(ISNULL(ROUND(CAST([past].Lines as decimal(6,2))/30,0),0)as int) as YestLines,
 case 
-	when [current].Lines > ISNULL([past].Lines,0) then 'UP' 
-	when [current].Lines < ISNULL([past].Lines,0) then 'DOWN'
+	when ISNULL([current].Lines,0) > CAST(ISNULL(ROUND(CAST([past].Lines as decimal(6,2))/30,0),0)as int) then 'UP' 
+	when ISNULL([current].Lines,0) < CAST(ISNULL(ROUND(CAST([past].Lines as decimal(6,2))/30,0),0)as int) then 'DOWN'
 	else 'EVEN' end as Trend
 
 from 
 
-list		
---Yesterdays Data
-left join(
-			select 
-			rq.CREATION_DATE as CREATION_DATE,
-			rq.COMPANY,
-			rq.REQ_LOCATION,
-			count(*) as Lines
+list
+inner join bluebin.DimFacility df on list.COMPANY = df.FacilityID		
 
-			from REQLINE rq
-			inner join bluebin.DimBin db on rq.COMPANY = db.BinFacility and rq.REQ_LOCATION = db.LocationID and rq.ITEM = db.ItemID 
-			inner join REQHEADER rh on rq.REQ_NUMBER = rh.REQ_NUMBER
-			where rq.CREATION_DATE > getdate() -3  and rq.CREATION_DATE < getdate() -2 and rq.STATUS =9  and rq.KILL_QUANTITY = 0 
+left join(
+			select
+			db.BinFacility as COMPANY,
+			db.LocationID as REQ_LOCATION,
+			count(*) as Lines
+			from bluebin.FactScan fs
+			inner join bluebin.DimBin db on fs.BinKey = db.BinKey
+			inner join bluebin.DimLocation dl on db.LocationID = dl.LocationID and dl.BlueBinFlag = 1
+			where fs.OrderDate > getdate() -32 and fs.OrderDate < getdate() -2
 			group by
-			rq.CREATION_DATE,
-			rq.COMPANY,
-			rq.REQ_LOCATION
-			) [past] on list.COMPANY = past.COMPANY and list.REQ_LOCATION = past.REQ_LOCATION
+			db.BinFacility,
+			db.LocationID
+			)
+			[past] on list.COMPANY = past.COMPANY and list.REQ_LOCATION = past.REQ_LOCATION
 			
 --Todays Data
 left join (
-select 
-			rq.CREATION_DATE as CREATION_DATE,
-			rq.COMPANY,
-			rq.REQ_LOCATION,
+
+select
+			db.BinFacility as COMPANY,
+			db.LocationID as REQ_LOCATION,
 			count(*) as Lines
-			from REQLINE rq
-			inner join bluebin.DimBin db on rq.COMPANY = db.BinFacility and rq.REQ_LOCATION = db.LocationID and rq.ITEM = db.ItemID 
-			inner join REQHEADER rh on rq.REQ_NUMBER = rh.REQ_NUMBER
-			where rq.CREATION_DATE > getdate() -2 and rq.CREATION_DATE < getdate() -1 and rq.STATUS =9 and rq.KILL_QUANTITY = 0  
+			from bluebin.FactScan fs
+			inner join bluebin.DimBin db on fs.BinKey = db.BinKey
+			inner join bluebin.DimLocation dl on db.LocationID = dl.LocationID and dl.BlueBinFlag = 1
+			where fs.OrderDate > @TodayDate
 			group by
-			rq.CREATION_DATE,
-			rq.COMPANY,
-			rq.REQ_LOCATION
+			db.BinFacility,
+			db.LocationID
+
 			) [current] on list.COMPANY = [current].COMPANY and list.REQ_LOCATION = [current].REQ_LOCATION
  
 order by [list].REQ_LOCATION
 
 
-GO
-grant exec on tb_TodaysOrders to public
+
 GO
 
 

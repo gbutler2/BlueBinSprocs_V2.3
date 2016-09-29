@@ -1,39 +1,24 @@
-/*********************************************************************
-
-		FactIssue
-
-*********************************************************************/
-
-IF EXISTS ( SELECT  *
-            FROM    sys.objects
-            WHERE   object_id = OBJECT_ID(N'etl_FactIssue')
-                    AND type IN ( N'P', N'PC' ) ) 
-
-DROP PROCEDURE  etl_FactIssue
+if exists (select * from dbo.sysobjects where id = object_id(N'tb_HBPickLines') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+drop procedure tb_HBPickLines
 GO
---exec etl_FactIssue
-CREATE PROCEDURE etl_FactIssue
-
+--exec tb_HBPickLines
+CREATE PROCEDURE tb_HBPickLines
 AS
-
-/****************************		DROP FactIssue ***********************************/
- BEGIN TRY
- DROP TABLE bluebin.FactIssue
- END TRY
- BEGIN CATCH
- END CATCH
-
- /*******************************	CREATE FactIssue	*********************************/
+BEGIN
+SET NOCOUNT ON
 
 
- SELECT 
-		a.COMPANY                                                                                AS FacilityKey,
+SELECT 
+df.FacilityName,
+fi.LocationID,
+Cast(fi.IssueDate AS DATE) AS Date,
+Count(*) AS PickLine
+
+FROM   (
+SELECT COMPANY                                                                                AS FacilityKey,
        a.LOCATION as LocationID,
-	   b.LocationKey,
-	   c.LocationKey                                                                          AS ShipLocationKey,
-       c.LocationFacility                                                                     AS ShipFacilityKey,
-       c.BlueBinFlag,
-	  d.ItemKey,
+       c.LocationFacility                                                                     AS ShipFacilityKey,                                                                   
+       d.ItemKey,
        SYSTEM_CD as SourceSystem,
        CASE
          WHEN SYSTEM_CD = 'RQ' THEN DOCUMENT
@@ -55,7 +40,6 @@ AS
          ELSE 0
        END                                                                                    AS StatCall,
        1                                                                                      AS IssueCount
-INTO bluebin.FactIssue
 FROM   ICTRANS a
        LEFT JOIN bluebin.DimLocation b
                ON a.LOCATION = b.LocationID
@@ -63,14 +47,20 @@ FROM   ICTRANS a
        LEFT JOIN bluebin.DimLocation c
                ON a.FROM_TO_LOC = c.LocationID
                   AND a.FROM_TO_CMPY = c.LocationFacility
-       LEFT JOIN bluebin.DimItem d
+		LEFT JOIN bluebin.DimItem d
                ON a.ITEM = d.ItemID
-WHERE  DOC_TYPE = 'IS'  and a.DOCUMENT not like '%[A-Z]%' --and c.BlueBinFlag = 1
+WHERE  DOC_TYPE = 'IS'  
+and a.DOCUMENT not like '%[A-Z]%' 
+and TRANS_DATE > getdate() -15
+and a.LOCATION in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')) fi
 
+inner join bluebin.DimFacility df on fi.ShipFacilityKey = df.FacilityID
+where fi.IssueDate > getdate() -15
+GROUP  BY df.FacilityName,fi.LocationID,Cast(fi.IssueDate AS DATE)
+order by 1,2,3
+
+
+END
 GO
-
-UPDATE etl.JobSteps
-SET LastModifiedDate = GETDATE()
-WHERE StepName = 'FactIssue'
-
+grant exec on tb_HBPickLines to public
 GO

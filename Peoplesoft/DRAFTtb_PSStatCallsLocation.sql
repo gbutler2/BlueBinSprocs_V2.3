@@ -9,34 +9,44 @@ BEGIN
 SET NOCOUNT ON
 
 
+--SELECT
+--    a.FROM_TO_CMPY,
+--	df.FacilityName,
+--	--a.LOCATION,
+--	b.REQ_LOCATION,
+--	dl.BlueBinFlag,
+--	TRANS_DATE as Date,
+--    COUNT(*) as StatCalls,
+--    LTRIM(RTRIM(c.ACCT_UNIT)) + ' - '+ c.DESCRIPTION       as Department
+--FROM
+--    ICTRANS a 
+--INNER JOIN
+--RQLOC b ON a.FROM_TO_CMPY = b.COMPANY AND a.FROM_TO_LOC = b.REQ_LOCATION
+--INNER JOIN
+--GLNAMES c ON b.COMPANY = c.COMPANY AND b.ISS_ACCT_UNIT = c.ACCT_UNIT
+--INNER JOIN bluebin.DimFacility df on a.FROM_TO_CMPY = df.FacilityID
+--INNER JOIN bluebin.DimLocation dl on b.REQ_LOCATION = dl.LocationID
+--WHERE SYSTEM_CD = 'IC' AND DOC_TYPE = 'IS' --and dl.BlueBinFlag = 1
+--GROUP BY
+--    a.FROM_TO_CMPY,
+--	df.FacilityName,
+--	--a.LOCATION,
+--	b.REQ_LOCATION,
+--	dl.BlueBinFlag,
+--	TRANS_DATE,
+--    c.ACCT_UNIT,
+--    c.DESCRIPTION
+--Order by TRANS_DATE desc
+
 SELECT
-    a.FROM_TO_CMPY,
-	df.FacilityName,
-	--a.LOCATION,
-	b.REQ_LOCATION,
-	dl.BlueBinFlag,
-	TRANS_DATE as Date,
-    COUNT(*) as StatCalls,
-    LTRIM(RTRIM(c.ACCT_UNIT)) + ' - '+ c.DESCRIPTION       as Department
-FROM
-    ICTRANS a 
-INNER JOIN
-RQLOC b ON a.FROM_TO_CMPY = b.COMPANY AND a.FROM_TO_LOC = b.REQ_LOCATION
-INNER JOIN
-GLNAMES c ON b.COMPANY = c.COMPANY AND b.ISS_ACCT_UNIT = c.ACCT_UNIT
-INNER JOIN bluebin.DimFacility df on a.FROM_TO_CMPY = df.FacilityID
-INNER JOIN bluebin.DimLocation dl on b.REQ_LOCATION = dl.LocationID
-WHERE SYSTEM_CD = 'IC' AND DOC_TYPE = 'IS' --and dl.BlueBinFlag = 1
-GROUP BY
-    a.FROM_TO_CMPY,
-	df.FacilityName,
-	--a.LOCATION,
-	b.REQ_LOCATION,
-	dl.BlueBinFlag,
-	TRANS_DATE,
-    c.ACCT_UNIT,
-    c.DESCRIPTION
-Order by TRANS_DATE desc
+    '' AS FROM_TO_CMPY,
+	'' AS FacilityName,
+	'' AS REQ_LOCATION,
+	'' AS BlueBinFlag,
+	'' AS Date,
+    '' AS StatCalls,
+    '' AS Department
+
 
 END
 GO

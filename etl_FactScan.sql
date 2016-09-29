@@ -1,3 +1,10 @@
+
+/*************************************************
+
+			FactScan
+
+*************************************************/
+
 IF EXISTS ( SELECT  *
             FROM    sys.objects
             WHERE   object_id = OBJECT_ID(N'etl_FactScan')
@@ -143,6 +150,7 @@ Row_number()
            ORDER BY a.CREATION_DATE ASC) AS ScanHistseq,
        a.COMPANY					AS OrderFacility,
 	   b.BinKey,
+	   b.BinLeadTime,
        b.LocationID,
        b.ItemID,
        b.BinGoLiveDate,
@@ -184,7 +192,7 @@ FROM   #REQLINE a
 
 
 /***********************************		CREATE FactScan		****************************************/
-
+declare @DefaultLT int = (Select max(ConfigValue) from bluebin.Config where ConfigName = 'DefaultLeadTime')
 
 SELECT a.Scanseq,
        a.ScanHistseq,
@@ -203,12 +211,12 @@ SELECT a.Scanseq,
        case when b.OrderCancelDate is not null  and a.ItemType <> 'I' then b.OrderCancelDate else b.OrderCloseDate end AS PrevOrderCloseDate,
        1                       AS Scan,
        CASE
-         WHEN Datediff(Day, b.OrderDate, a.OrderDate) < 3 THEN 1
+         WHEN Datediff(Day, b.OrderDate, a.OrderDate) < COALESCE(a.BinLeadTime,@DefaultLT,3) THEN 1
          ELSE 0
        END                     AS HotScan,
        CASE
          WHEN a.OrderDate < COALESCE(b.OrderCloseDate, b.OrderCancelDate, Getdate())
-              AND a.ScanHistseq > (select ConfigValue + 1 from bluebin.Config where ConfigName = 'ScanThreshold') THEN 1
+              AND a.ScanHistseq > (select ConfigValue + 1 from bluebin.Config where ConfigName = 'ScanThreshold') THEN 1 --When looking for stockouts you have to take the scanseq 2 after the ignored one
          ELSE 0
        END                     AS StockOut
 INTO   bluebin.FactScan

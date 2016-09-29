@@ -16,7 +16,7 @@ Count(*) AS PickLine
 FROM   bluebin.FactIssue fi
 inner join bluebin.DimFacility df on fi.ShipFacilityKey = df.FacilityID
 
-WHERE fi.IssueDate > getdate() -15 and fi.LocationID in (select ConfigValue from bluebin.Config where ConfigName = 'LOCATION') --Filter for HB
+WHERE fi.IssueDate > getdate() -15 and fi.LocationID in (select ConfigValue from bluebin.Config where ConfigName = 'PS_BUSINESSUNIT') --Filter for HB
 
 GROUP  BY df.FacilityName,fi.LocationID,Cast(fi.IssueDate AS DATE)
 order by 1,2,3 

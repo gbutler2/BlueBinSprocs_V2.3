@@ -108,7 +108,10 @@ END
 --*******************************************************************************************************************************************
 --*******************************************************************************************************************************************
 
-
+if not exists(select * from sys.columns where name = 'Sequence' and object_id = (select object_id from sys.tables where name = 'QCN'))
+BEGIN
+ALTER TABLE qcn.QCN ADD Sequence varchar(30)
+END
 
 
 if not exists(select * from sys.columns where name = 'Description' and object_id = (select object_id from sys.tables where name = 'QCNType'))
@@ -208,7 +211,7 @@ update qcn.QCN set AssignedUserID = z.ID from
 		from qcn.QCN q
 			inner join bluebin.BlueBinResource b on q.AssignedUserID = b.BlueBinResourceID
 			left join bluebin.BlueBinUser a on b.FirstName = a.FirstName and b.LastName = a.LastName) z where QCNID = z.Q
-
+update qcn.QCN set AssignedUserID = NULL where AssignedUserID = 0
 --Update QCN Types
 --select * from qcn.QCNType
 if not exists(select * from qcn.QCNType where Name = 'REMOVE')
@@ -527,10 +530,38 @@ where so.OpName like 'MENU%' and so.OpID not in (select OpID from bluebin.BlueBi
 END 
 GO
 
-
+if not exists(select * from sys.columns where name = 'SKUS' and object_id = (select object_id from sys.tables where name = 'FactWHHistory'))
+BEGIN
+ALTER TABLE bluebin.FactWHHistory ADD [SKUS] int;
+END
+GO
 
 --*******************
 --Config Stuff
+
+/* PEOPLESOFT CONFIGS*/
+if not exists(select * from bluebin.Config where ConfigName = 'PS_DefaultFacility')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'PS_DefaultFacility','',1,getdate(),'Tableau','Value for a Default Facility if none exist.  Used in Peoplesoft.  Defaults to 99'
+END
+GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'PS_InFulfillState')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'PS_InFulfillState','',1,getdate(),'Tableau','Value for in Fulfill State to match.'
+END
+GO
+
+if not exists(select * from bluebin.Config where ConfigName = 'PS_BUSINESSUNIT')  
+BEGIN
+insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description])
+select 'PS_BUSINESSUNIT','',1,getdate(),'Tableau','Business Unit to Match to for Warehouse Identity.'
+END
+GO
+
+/*  */
 
 if exists(select * from scan.ScanBatch where ScanType = 'Order')  
 BEGIN
@@ -592,6 +623,7 @@ END
 if not exists(select * from bluebin.Config where ConfigType = 'Reports' and ConfigName like 'OP-%')  
 BEGIN
 insert into bluebin.Config (ConfigName,ConfigValue,Active,LastUpdated,ConfigType,[Description]) VALUES
+('OP-Warehouse History','0',1,getdate(),'Reports','Setting for whether to display the WH History Report'),
 ('OP-Item Usage','0',1,getdate(),'Reports','Setting for whether to display the Item Usage Report'),
 ('OP-Pick Line Volume','1',1,getdate(),'Reports','Setting for whether to display the Pick Line Volume Report'),
 ('OP-Supply Spend','1',1,getdate(),'Reports','Setting for whether to display the Supply Spend Report'),
@@ -3317,6 +3349,7 @@ CREATE PROCEDURE sp_EditQCN
 @LocationID varchar(10),
 @ItemID varchar(32),
 @ClinicalDescription varchar(30),
+@Sequence varchar(30),
 @Requester varchar(255),
 @ApprovedBy varchar(255),
 @Assigned int,
@@ -3341,6 +3374,7 @@ FacilityID = @FacilityID,
 [LocationID] = @LocationID,
 [ItemID] = @ItemID,
 ClinicalDescription = @ClinicalDescription,
+[Sequence] = @Sequence,
 [RequesterUserID] = @Requester,
 ApprovedBy = @ApprovedBy,
 [AssignedUserID] = @Assigned,
@@ -3366,7 +3400,6 @@ END
 GO
 grant exec on sp_EditQCN to appusers
 GO
-
 
 --*****************************************************
 --**************************SPROC**********************
@@ -3988,6 +4021,7 @@ SELECT
 	,a.FacilityID
 	,rtrim(a.ItemID) as ItemID
 	,a.ClinicalDescription
+	,a.[Sequence]
 	,RequesterUserID as RequesterUser
 	,ApprovedBy
 	,a.[AssignedUserID] as AssignedUser
@@ -4017,6 +4051,8 @@ END
 GO
 grant exec on sp_SelectQCNFormEdit to appusers
 GO
+
+
 
 
 --*****************************************************
@@ -5141,6 +5177,7 @@ CREATE PROCEDURE sp_InsertQCN
 @LocationID varchar(10),
 @ItemID varchar(32),
 @ClinicalDescription varchar(30),
+@Sequence varchar(30),
 @Requester varchar(255),
 @ApprovedBy varchar(255),
 @Assigned int,
@@ -5169,6 +5206,7 @@ insert into [qcn].[QCN]
 [LocationID],
 	[ItemID],
 		[ClinicalDescription],
+		[Sequence],
 		[RequesterUserID],
 		[ApprovedBy],
 			[AssignedUserID],
@@ -5193,6 +5231,7 @@ select
 @LocationID,
 case when @ItemID = '' then NULL else @ItemID end,
 @ClinicalDescription,
+@Sequence,
 @Requester,
 @ApprovedBy,
 case when @Assigned = '' then NULL else @Assigned end,
@@ -7719,7 +7758,7 @@ Print 'Job Updates Complete'
 --Version Update
 --*************************************************************************************************************************************************
 
-declare @version varchar(50) = '2.3.20160819' --Update Version Number here
+declare @version varchar(50) = '2.3.20160920' --Update Version Number here
 
 
 if not exists (select * from bluebin.Config where ConfigName = 'Version')

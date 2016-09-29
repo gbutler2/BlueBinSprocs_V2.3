@@ -7,6 +7,7 @@ DROP PROCEDURE  ssp_ReqLookup
 GO
 
 --exec ssp_ReqLookup '180'
+
 CREATE PROCEDURE ssp_ReqLookup
 @ReqNumber varchar(30)
 AS

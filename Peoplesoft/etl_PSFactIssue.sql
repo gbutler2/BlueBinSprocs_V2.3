@@ -1,3 +1,9 @@
+/*********************************************************************
+
+		FactIssue
+
+*********************************************************************/
+
 IF EXISTS ( SELECT  *
             FROM    sys.objects
             WHERE   object_id = OBJECT_ID(N'etl_FactIssue')
@@ -18,47 +24,48 @@ AS
  END CATCH
 
  /*******************************	CREATE FactIssue	*********************************/
+  declare @Facility int
+   select @Facility = ConfigValue from bluebin.Config where ConfigName = 'PS_DefaultFacility'
+  
 
- SELECT COMPANY                                                                                AS FacilityKey,
-       b.LocationKey,
-       c.LocationKey                                                                          AS ShipLocationKey,
-       c.LocationFacility                                                                     AS ShipFacilityKey,
-       d.ItemKey,
-       SYSTEM_CD as SourceSystem,
-       CASE
-         WHEN SYSTEM_CD = 'RQ' THEN DOCUMENT
-         ELSE ''
-       END                                                                                    AS ReqNumber,
-       CASE
-         WHEN SYSTEM_CD = 'RQ' THEN LINE_NBR
-         ELSE ''
-       END                                                                                    AS ReqLineNumber,
-       Cast(CONVERT(VARCHAR, TRANS_DATE, 101) + ' '
-            + LEFT(RIGHT('00000' + CONVERT(VARCHAR, ACTUAL_TIME), 4), 2)
-            + ':'
-            + Substring(RIGHT('00000' + CONVERT(VARCHAR, ACTUAL_TIME), 4), 3, 2) AS DATETIME) AS IssueDate,
-       TRAN_UOM as UOM,
-       TRAN_UOM_MULT as UOMMult,
-       -QUANTITY                                                                              AS IssueQty,
-       CASE
-         WHEN SYSTEM_CD = 'IC' THEN 1
-         ELSE 0
-       END                                                                                    AS StatCall,
-       1                                                                                      AS IssueCount
+  
+  SELECT 
+
+		case when @Facility is not null or @Facility <> '' then @Facility else '' end as FacilityKey,
+		Picks.BUSINESS_UNIT AS LocationID,
+       b.LocationKey AS LocationKey,
+       c.LocationKey AS ShipLocationKey,
+       case when @Facility is not null or @Facility <> '' then @Facility else '' end as ShipFacilityKey,
+       c.BlueBinFlag,
+	   d.ItemKey AS ItemKey,
+       '' AS  SourceSystem,
+       Picks.ORDER_NO AS ReqNumber,
+       Picks.ORDER_INT_LINE_NO AS ReqLineNumber,
+       Picks.SCHED_DTTM AS IssueDate,
+       Picks.UNIT_OF_MEASURE AS UOM,
+       '' AS UOMMult,
+       Picks.QTY_PICKED AS  IssueQty,
+       case when PICK_BATCH_ID = 0 then 1 else 0 end AS StatCall,
+       1  AS IssueCount
 INTO bluebin.FactIssue
-FROM   ICTRANS a
-       LEFT JOIN bluebin.DimLocation b
-               ON a.LOCATION = b.LocationID
-                  AND a.COMPANY = b.LocationFacility
+FROM   dbo.IN_DEMAND Picks
+	  LEFT JOIN bluebin.DimLocation b
+               ON Picks.BUSINESS_UNIT = b.LocationID
+                  AND @Facility = b.LocationFacility
        LEFT JOIN bluebin.DimLocation c
-               ON a.FROM_TO_LOC = c.LocationID
-                  AND a.FROM_TO_CMPY = c.LocationFacility
+               ON Picks.LOCATION = c.LocationID
+                  AND @Facility = c.LocationFacility
        LEFT JOIN bluebin.DimItem d
-               ON a.ITEM = d.ItemID
-WHERE  DOC_TYPE = 'IS'  and a.DOCUMENT not like '%[A-Z]%' 
+               ON Picks.INV_ITEM_ID = d.ItemID
 
+WHERE  
+CANCEL_DTTM IS NULL or CANCEL_DTTM < '1900-01-02'
+
+	
 GO
 
 UPDATE etl.JobSteps
 SET LastModifiedDate = GETDATE()
 WHERE StepName = 'FactIssue'
+
+GO

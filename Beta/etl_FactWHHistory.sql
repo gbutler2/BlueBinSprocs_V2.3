@@ -73,7 +73,7 @@ ELSE
 				GROUP BY
 				i.FacilityName,
 				i.LocationID
-				
+				select * from bluebin.FactWHHistory order by 1
 			END
 			ELSE
 				BEGIN

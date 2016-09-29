@@ -81,7 +81,7 @@ FROM   bluebin.DimBin
        LEFT JOIN bluebin.DimBinStatus
               ON FactBinSnapshot.BinStatusKey = DimBinStatus.BinStatusKey
 	   left join bluebin.DimFacility df on bluebin.DimBin.BinFacility = df.FacilityID
-	   left join dbo.REQHEADER rqh on FactScan.OrderNum = rqh.REQ_NUMBER
+	   --left join dbo.REQHEADER rqh on FactScan.OrderNum = rqh.REQ_NUMBER
 WHERE  Date >= DimBin.BinGoLiveDate 
 
 GO

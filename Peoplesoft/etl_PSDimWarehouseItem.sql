@@ -1,3 +1,9 @@
+/************************************************************
+
+			DimWarehouseItem
+
+************************************************************/
+
 IF EXISTS ( SELECT  *
             FROM    sys.objects
             WHERE   object_id = OBJECT_ID(N'etl_DimWarehouseItem')
@@ -19,14 +25,16 @@ END TRY
 BEGIN CATCH
 END CATCH
 
-
+declare @Facility int
+   select @Facility = ConfigValue from bluebin.Config where ConfigName = 'PS_DefaultFacility'
+   
 
 SELECT 
 		--d.LocationID,
-		a.COMPANY,
-		df.FacilityName,
-		a.LOCATION as LocationID,
-		a.LOCATION as LocationName,
+		case when @Facility is not null or @Facility <> '' then @Facility else ''end as FacilityID,
+		case when @Facility is not null or @Facility <> '' then (select FacilityName from bluebin.DimFacility where FacilityID = @Facility) else ''end as FacilityName,
+		a.BUSINESS_UNIT as LocationID,
+		a.BUSINESS_UNIT as LocationName,
 		b.ItemKey,
        b.ItemID,
        b.ItemDescription,
@@ -35,19 +43,19 @@ SELECT
        b.ItemManufacturerNumber,
        b.ItemVendor,
        b.ItemVendorNumber,
-       a.PREFER_BIN    AS StockLocation,
-       a.SOH_QTY       AS SOHQty,
-       a.MAX_ORDER     AS ReorderQty,
-       a.REORDER_POINT AS ReorderPoint,
-	   a.LAST_ISS_COST	AS UnitCost,
+       ''    AS StockLocation,
+       a.[QTY_ONHAND]       AS SOHQty,
+       a.[QTY_MAXIMUM]     AS ReorderQty,
+       a.[REORDER_POINT] AS ReorderPoint,
+	   a.[LAST_PRICE_PAID]	AS UnitCost,
        b.StockUOM,
        b.BuyUOM,
        b.PackageString
 INTO   bluebin.DimWarehouseItem
-FROM   ITEMLOC a
+FROM   [dbo].[BU_ITEMS_INV] a
        INNER JOIN bluebin.DimItem b
-               ON a.ITEM = b.ItemID
-		INNER JOIN bluebin.DimFacility df on a.COMPANY = df.FacilityID
+               ON a.[INV_ITEM_ID] = b.ItemID
+		
        --INNER JOIN ICCATEGORY c
        --        ON a.COMPANY = c.COMPANY
        --           AND a.LOCATION = c.LOCATION
@@ -59,8 +67,8 @@ FROM   ITEMLOC a
 		--ON a.COMPANY = e.COMPANY
 		--AND a.LOCATION = e.LOCATION
 
-WHERE a.LOCATION in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
-
+--WHERE a.BUSINESS_UNIT in (Select ConfigValue from bluebin.Config where ConfigName = 'LOCATION')
+WHERE a.BUSINESS_UNIT in (Select ConfigValue from bluebin.Config where ConfigName = 'PS_BUSINESSUNIT')
 
 GO
 
